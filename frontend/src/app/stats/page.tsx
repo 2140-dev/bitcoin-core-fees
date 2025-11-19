@@ -2,11 +2,12 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { api, type FeeEstimate } from "@/lib/api";
+import { api, type FeeEstimate, type AnalyticsSummary } from "@/lib/api";
 import BlockTemplateVisualization from "@/app/components/BlockTemplateVisualization";
 
 export default function StatsPage() {
   const [feeEstimate, setFeeEstimate] = useState<FeeEstimate | null>(null);
+  const [summary, setSummary] = useState<AnalyticsSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [target, setTarget] = useState(1);
@@ -18,15 +19,12 @@ export default function StatsPage() {
       setError(null);
       const data = await api.getFeeEstimate(confTarget, "economical", 2);
       setFeeEstimate(data);
+      // Also refresh analytics summary
+      const s = await api.getAnalyticsSummary(1000);
+      setSummary(s);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to fetch data");
-      // Set fallback data to prevent crashes
-      setFeeEstimate({
-        forecaster: "fallback",
-        blocks: confTarget,
-        feerate: 0.00001, // 1 sat/vB
-        errors: ["API connection failed - using fallback data"],
-      });
+      setFeeEstimate(null);
     } finally {
       setLoading(false);
     }
@@ -267,34 +265,82 @@ export default function StatsPage() {
           </div>
         )}
 
-        {/* Mempool-Based Estimation Demo */}
+        {/* Enhanced Mempool-Based Estimation Demo */}
         <div className="bg-gradient-to-r from-orange-50 to-green-50 dark:from-orange-900/20 dark:to-green-900/20 rounded-xl p-8 border border-orange-200 dark:border-orange-800">
           <h2 className="text-3xl font-bold text-gray-900 dark:text-white mb-6 text-center">
-            Mempool-Based Estimation Preview
+            Mempool-Based Estimation Analysis
           </h2>
-          <div className="grid md:grid-cols-2 gap-8">
-            <div>
-              <h3 className="text-2xl font-semibold text-gray-900 dark:text-white mb-4">
+          <div className="grid md:grid-cols-3 gap-8">
+            <div className="bg-red-50 dark:bg-red-900/20 rounded-lg p-6 border border-red-200 dark:border-red-800">
+              <h3 className="text-2xl font-semibold text-red-800 dark:text-red-200 mb-4 flex items-center">
+                <div className="w-3 h-3 bg-red-500 rounded-full mr-3"></div>
                 Current System Issues
               </h3>
-              <ul className="space-y-2 text-gray-600 dark:text-gray-400">
-                <li>
-                  • &quot;Mempool is unreliable for fee rate forecasting&quot;
+              <ul className="space-y-3 text-red-700 dark:text-red-300">
+                <li className="flex items-start">
+                  <span className="text-red-500 mr-2">⚠️</span>
+                  &quot;Mempool is unreliable for fee rate forecasting&quot;
                 </li>
-                <li>• Based on historical data, not current conditions</li>
-                <li>• Slow to react to network changes</li>
-                <li>• High overpayment rates (29.46%)</li>
+                <li className="flex items-start">
+                  <span className="text-red-500 mr-2">📊</span>
+                  Based on historical data, not current conditions
+                </li>
+                <li className="flex items-start">
+                  <span className="text-red-500 mr-2">🐌</span>
+                  Slow to react to network changes
+                </li>
+                <li className="flex items-start">
+                  <span className="text-red-500 mr-2">💰</span>
+                  High overpayment rates (29.46%)
+                </li>
               </ul>
             </div>
-            <div>
-              <h3 className="text-2xl font-semibold text-gray-900 dark:text-white mb-4">
-                Mempool-Based Solution
+            <div className="bg-yellow-50 dark:bg-yellow-900/20 rounded-lg p-6 border border-yellow-200 dark:border-yellow-800">
+              <h3 className="text-2xl font-semibold text-yellow-800 dark:text-yellow-200 mb-4 flex items-center">
+                <div className="w-3 h-3 bg-yellow-500 rounded-full mr-3"></div>
+                Proposed Solution
               </h3>
-              <ul className="space-y-2 text-gray-600 dark:text-gray-400">
-                <li>• Real-time mempool analysis</li>
-                <li>• 50th percentile fee rate estimation</li>
-                <li>• Responsive to current network conditions</li>
-                <li>• Dramatically reduced overpayment (0.03%)</li>
+              <ul className="space-y-3 text-yellow-700 dark:text-yellow-300">
+                <li className="flex items-start">
+                  <span className="text-yellow-500 mr-2">⚡</span>
+                  Real-time mempool analysis
+                </li>
+                <li className="flex items-start">
+                  <span className="text-yellow-500 mr-2">📈</span>
+                  50th percentile fee rate estimation
+                </li>
+                <li className="flex items-start">
+                  <span className="text-yellow-500 mr-2">🔄</span>
+                  Responsive to current network conditions
+                </li>
+                <li className="flex items-start">
+                  <span className="text-yellow-500 mr-2">💡</span>
+                  Dramatically reduced overpayment (0.03%)
+                </li>
+              </ul>
+            </div>
+            <div className="bg-green-50 dark:bg-green-900/20 rounded-lg p-6 border border-green-200 dark:border-green-800">
+              <h3 className="text-2xl font-semibold text-green-800 dark:text-green-200 mb-4 flex items-center">
+                <div className="w-3 h-3 bg-green-500 rounded-full mr-3"></div>
+                Implementation Benefits
+              </h3>
+              <ul className="space-y-3 text-green-700 dark:text-green-300">
+                <li className="flex items-start">
+                  <span className="text-green-500 mr-2">🎯</span>
+                  Higher accuracy (80.96% vs 59.50%)
+                </li>
+                <li className="flex items-start">
+                  <span className="text-green-500 mr-2">💸</span>
+                  Cost savings for users
+                </li>
+                <li className="flex items-start">
+                  <span className="text-green-500 mr-2">🚀</span>
+                  Better user experience
+                </li>
+                <li className="flex items-start">
+                  <span className="text-green-500 mr-2">📊</span>
+                  Real-time data insights
+                </li>
               </ul>
             </div>
           </div>
@@ -312,13 +358,17 @@ export default function StatsPage() {
           <BlockTemplateVisualization blockHeight={blockHeight} />
         </div>
 
-        {/* Performance Metrics */}
+        {/* Performance Metrics (live from /analytics/summary if available) */}
         <div className="mt-12">
           <h2 className="text-3xl font-bold text-center text-gray-900 dark:text-white mb-8">
             Performance Metrics
           </h2>
           <p className="text-center text-gray-600 dark:text-gray-300 mb-8">
-            Based on 19,154 estimates from Block 832,330 to 834,362
+            {summary
+              ? `Window: ${summary.window ?? 1000} • Source: ${
+                  summary.source ?? "internal"
+                }`
+              : "Loading recent analytics..."}
           </p>
 
           <div className="grid md:grid-cols-3 gap-8 mb-12">
@@ -326,7 +376,7 @@ export default function StatsPage() {
               <div className="absolute inset-0 bg-gradient-to-br from-green-500/5 to-transparent rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
               <div className="relative z-10">
                 <div className="text-5xl font-bold text-green-400 mb-3 transition-all duration-500 ease-out">
-                  80.96%
+                  {summary ? `${summary.within_perc}%` : "—"}
                 </div>
                 <div className="text-lg text-gray-300 mb-2">Accuracy Rate</div>
                 <div className="text-sm text-green-400">
@@ -335,7 +385,9 @@ export default function StatsPage() {
                 <div className="w-full bg-gray-700 rounded-full h-2 mt-4">
                   <div
                     className="bg-gradient-to-r from-green-500 to-green-400 h-2 rounded-full transition-all duration-1000"
-                    style={{ width: "80.96%" }}
+                    style={{
+                      width: summary ? `${summary.within_perc}%` : "0%",
+                    }}
                   ></div>
                 </div>
               </div>
@@ -345,16 +397,22 @@ export default function StatsPage() {
               <div className="absolute inset-0 bg-gradient-to-br from-blue-500/5 to-transparent rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
               <div className="relative z-10">
                 <div className="text-5xl font-bold text-blue-400 mb-3 transition-all duration-500 ease-out">
-                  0.03%
+                  {summary ? `${summary.overpayment_perc}%` : "—"}
                 </div>
                 <div className="text-lg text-gray-300 mb-2">
                   Overpayment Rate
                 </div>
-                <div className="text-sm text-blue-400">vs 29.46% current</div>
+                <div className="text-sm text-blue-400">
+                  {summary
+                    ? `${summary.overpayment_val} overpaid of ${summary.total}`
+                    : ""}
+                </div>
                 <div className="w-full bg-gray-700 rounded-full h-2 mt-4">
                   <div
                     className="bg-gradient-to-r from-blue-500 to-blue-400 h-2 rounded-full transition-all duration-1000"
-                    style={{ width: "0.03%" }}
+                    style={{
+                      width: summary ? `${summary.overpayment_perc}%` : "0%",
+                    }}
                   ></div>
                 </div>
               </div>
@@ -364,115 +422,129 @@ export default function StatsPage() {
               <div className="absolute inset-0 bg-gradient-to-br from-yellow-500/5 to-transparent rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
               <div className="relative z-10">
                 <div className="text-5xl font-bold text-yellow-400 mb-3 transition-all duration-500 ease-out">
-                  Real-time
+                  {summary?.avg_block_coverage != null
+                    ? `${Math.round(summary.avg_block_coverage * 100)}%`
+                    : "—"}
                 </div>
-                <div className="text-lg text-gray-300 mb-2">Data Updates</div>
+                <div className="text-lg text-gray-300 mb-2">Block Coverage</div>
                 <div className="text-sm text-yellow-400">
-                  Live mempool analysis
-                </div>
-                <div className="flex justify-center mt-4">
-                  <div className="w-3 h-3 bg-yellow-400 rounded-full animate-ping"></div>
+                  Avg fraction of mined txids present in our snapshot
                 </div>
               </div>
             </div>
           </div>
         </div>
 
-        {/* Performance Comparison */}
-        <div className="mt-12">
-          <h2 className="text-3xl font-bold text-center text-gray-900 dark:text-white mb-8">
-            Performance Comparison
+        {/* Performance Comparison removed (dummy) */}
+
+        {/* Implementation Roadmap */}
+        <div className="mt-16 bg-gradient-to-br from-gray-900/80 to-gray-800/80 backdrop-blur-sm rounded-2xl p-8 shadow-2xl border border-gray-700">
+          <h2 className="text-3xl font-bold text-white mb-8 text-center">
+            Implementation Roadmap & Suggestions
           </h2>
-          <div className="grid md:grid-cols-3 gap-6">
-            <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-lg border border-gray-200 dark:border-gray-700">
-              <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
-                Current System
+          <div className="grid md:grid-cols-2 gap-8">
+            <div className="space-y-6">
+              <h3 className="text-2xl font-semibold text-yellow-400 mb-4">
+                🚀 Phase 1: Core Implementation
               </h3>
-              <div className="space-y-3">
-                <div className="flex justify-between">
-                  <span className="text-gray-600 dark:text-gray-400">
-                    Overpaid:
-                  </span>
-                  <span className="text-red-600 font-bold transition-all duration-500 ease-out">
-                    29.46%
-                  </span>
+              <div className="space-y-4">
+                <div className="bg-gray-800/50 rounded-lg p-4 border border-yellow-500/20">
+                  <h4 className="text-lg font-semibold text-yellow-300 mb-2">
+                    Mempool Analysis Engine
+                  </h4>
+                  <p className="text-gray-300 text-sm">
+                    Implement real-time mempool monitoring with 50th percentile
+                    fee rate calculation
+                  </p>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600 dark:text-gray-400">
-                    Within Range:
-                  </span>
-                  <span className="text-gray-600 font-bold transition-all duration-500 ease-out">
-                    59.50%
-                  </span>
+                <div className="bg-gray-800/50 rounded-lg p-4 border border-yellow-500/20">
+                  <h4 className="text-lg font-semibold text-yellow-300 mb-2">
+                    API Integration
+                  </h4>
+                  <p className="text-gray-300 text-sm">
+                    Connect to Bitcoin Core RPC for live mempool and blockchain
+                    data
+                  </p>
                 </div>
-                <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2 mt-4">
-                  <div
-                    className="bg-red-500 h-2 rounded-full"
-                    style={{ width: "29.46%" }}
-                  ></div>
+                <div className="bg-gray-800/50 rounded-lg p-4 border border-yellow-500/20">
+                  <h4 className="text-lg font-semibold text-yellow-300 mb-2">
+                    Fee Estimation Algorithm
+                  </h4>
+                  <p className="text-gray-300 text-sm">
+                    Develop mempool-based fee estimation with configurable
+                    thresholds
+                  </p>
                 </div>
               </div>
             </div>
+            <div className="space-y-6">
+              <h3 className="text-2xl font-semibold text-green-400 mb-4">
+                📈 Phase 2: Enhancement
+              </h3>
+              <div className="space-y-4">
+                <div className="bg-gray-800/50 rounded-lg p-4 border border-green-500/20">
+                  <h4 className="text-lg font-semibold text-green-300 mb-2">
+                    Historical Analysis
+                  </h4>
+                  <p className="text-gray-300 text-sm">
+                    Add historical data comparison and trend analysis
+                    capabilities
+                  </p>
+                </div>
+                <div className="bg-gray-800/50 rounded-lg p-4 border border-green-500/20">
+                  <h4 className="text-lg font-semibold text-green-300 mb-2">
+                    Advanced Metrics
+                  </h4>
+                  <p className="text-gray-300 text-sm">
+                    Implement confidence intervals and accuracy tracking
+                  </p>
+                </div>
+                <div className="bg-gray-800/50 rounded-lg p-4 border border-green-500/20">
+                  <h4 className="text-lg font-semibold text-green-300 mb-2">
+                    User Interface
+                  </h4>
+                  <p className="text-gray-300 text-sm">
+                    Create intuitive dashboards and real-time visualization
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
 
-            <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-lg border border-orange-200 dark:border-orange-700">
-              <h3 className="text-xl font-semibold text-orange-600 dark:text-orange-400 mb-4">
-                Mempool-Based
-              </h3>
-              <div className="space-y-3">
-                <div className="flex justify-between">
-                  <span className="text-gray-600 dark:text-gray-400">
-                    Overpaid:
-                  </span>
-                  <span className="text-green-600 font-bold transition-all duration-500 ease-out">
-                    0.05%
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600 dark:text-gray-400">
-                    Within Range:
-                  </span>
-                  <span className="text-green-600 font-bold transition-all duration-500 ease-out">
-                    80.96%
-                  </span>
-                </div>
-                <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2 mt-4">
-                  <div
-                    className="bg-green-500 h-2 rounded-full"
-                    style={{ width: "80.96%" }}
-                  ></div>
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-lg border border-blue-200 dark:border-blue-700">
-              <h3 className="text-xl font-semibold text-blue-600 dark:text-blue-400 mb-4">
-                With Threshold
-              </h3>
-              <div className="space-y-3">
-                <div className="flex justify-between">
-                  <span className="text-gray-600 dark:text-gray-400">
-                    Overpaid:
-                  </span>
-                  <span className="text-green-600 font-bold transition-all duration-500 ease-out">
-                    0.03%
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600 dark:text-gray-400">
-                    Within Range:
-                  </span>
-                  <span className="text-green-600 font-bold transition-all duration-500 ease-out">
-                    73.50%
-                  </span>
-                </div>
-                <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2 mt-4">
-                  <div
-                    className="bg-blue-500 h-2 rounded-full"
-                    style={{ width: "73.50%" }}
-                  ></div>
-                </div>
-              </div>
-            </div>
+          <div className="mt-8 bg-gradient-to-r from-blue-500/10 to-purple-500/10 rounded-xl p-6 border border-blue-500/20">
+            <h3 className="text-xl font-semibold text-blue-300 mb-4">
+              💡 Key Suggestions for Bitcoin Core Integration
+            </h3>
+            <ul className="space-y-2 text-gray-300">
+              <li className="flex items-start">
+                <span className="text-blue-400 mr-2">•</span>
+                <span>
+                  Add mempool-based fee estimation as an alternative to the
+                  current historical method
+                </span>
+              </li>
+              <li className="flex items-start">
+                <span className="text-blue-400 mr-2">•</span>
+                <span>
+                  Implement configurable thresholds for different use cases
+                  (economical vs conservative)
+                </span>
+              </li>
+              <li className="flex items-start">
+                <span className="text-blue-400 mr-2">•</span>
+                <span>
+                  Provide both methods side-by-side for comparison and gradual
+                  adoption
+                </span>
+              </li>
+              <li className="flex items-start">
+                <span className="text-blue-400 mr-2">•</span>
+                <span>
+                  Add comprehensive testing and validation against historical
+                  data
+                </span>
+              </li>
+            </ul>
           </div>
         </div>
       </main>

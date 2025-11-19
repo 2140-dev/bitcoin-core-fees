@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useState, useEffect } from "react";
+import { api } from "@/lib/api";
 
 // Simple mempool data interface
 interface MempoolData {
@@ -10,6 +11,8 @@ interface MempoolData {
   totalFees: number;
   blockHeight: number;
   lastUpdate: string;
+  method: "mempool" | "historical" | "hybrid";
+  warnings?: string[];
 }
 
 export default function DashboardPage() {
@@ -20,17 +23,30 @@ export default function DashboardPage() {
     const fetchData = async () => {
       setLoading(true);
 
-      // Simulate API call with dummy data
-      setTimeout(() => {
+      try {
+        // Use unified estimator (mempool, target=1, p50)
+        const [unified, mempoolInfo, blockchainInfo] = await Promise.all([
+          api.getUnifiedEstimate("mempool", 1, 50),
+          api.getMempoolInfo(),
+          api.getBlockchainInfo(),
+        ]);
+
         setData({
-          feeRate: 5.2,
-          mempoolSize: 103733,
-          totalFees: 0.1086,
-          blockHeight: 834362,
+          feeRate: unified.fee_rate_sat_per_vb ?? 0,
+          mempoolSize: mempoolInfo.size,
+          totalFees: mempoolInfo.total_fee,
+          blockHeight: blockchainInfo.blocks,
           lastUpdate: new Date().toLocaleTimeString(),
+          method: (unified.method as MempoolData["method"]) || "mempool",
+          warnings: unified.warnings || [],
         });
-        setLoading(false);
-      }, 1000);
+      } catch (error) {
+        console.error("Failed to fetch real data:", error);
+        // Show error state instead of mock data
+        setData(null);
+      }
+
+      setLoading(false);
     };
 
     fetchData();
@@ -89,16 +105,15 @@ export default function DashboardPage() {
           </div>
         ) : (
           <div className="space-y-12">
-            {/* Block Template Visualization */}
+            {/* Main Fee Forecast Block */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 lg:gap-8">
-              {/* Main Fee Forecast Block */}
               <div className="space-y-4">
                 <div className="text-center">
                   <h3 className="text-lg font-semibold text-gray-200 mb-1">
                     Live Fee Estimate
                   </h3>
                   <p className="text-xs text-gray-400 mb-3">
-                    Recommended fee for next block inclusion
+                    Recommended fee for next block inclusion (p50, target=1)
                   </p>
                 </div>
 
@@ -119,14 +134,16 @@ export default function DashboardPage() {
                       {/* Additional context */}
                       <div className="bg-black/20 rounded-lg p-3 space-y-2">
                         <div className="text-sm font-medium">
-                          Estimate: Economical
+                          Estimator:{" "}
+                          {data?.method === "mempool"
+                            ? "Mempool (p50)"
+                            : data?.method}
                         </div>
-                        <div className="text-xs opacity-80">
-                          Balanced cost vs. confirmation speed
-                        </div>
-                        <div className="text-xs opacity-60 mt-1">
-                          Conservative: Higher fees, faster confirmation
-                        </div>
+                        {data?.warnings && data.warnings.length > 0 && (
+                          <div className="text-xs text-yellow-200">
+                            {data.warnings[0]}
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -142,137 +159,6 @@ export default function DashboardPage() {
                   </div>
                 </div>
               </div>
-
-              {/* KWU Block Templates*/}
-              {[
-                {
-                  blockNum: 100,
-                  targetKWU: 3.8,
-                  currentKWU: 3.8,
-                  label: "Current Block",
-                  description: "Transactions in current block",
-                  isFocused: true,
-                  color: "green",
-                },
-                {
-                  blockNum: 99,
-                  targetKWU: 3.8,
-                  currentKWU: 3.6,
-                  label: "Removed Transactions",
-                  description: "Weight removed from mempool",
-                  isFocused: false,
-                  color: "blue",
-                },
-                {
-                  blockNum: 98,
-                  targetKWU: 3.8,
-                  currentKWU: 3.5,
-                  label: "Previous Block",
-                  description: "Weight from previous block",
-                  isFocused: false,
-                  color: "purple",
-                },
-              ].map((block) => {
-                const utilizationPercent =
-                  (block.currentKWU / block.targetKWU) * 100;
-                const colorClasses = {
-                  green: "from-orange-500 to-orange-600 border-orange-400",
-                  blue: "from-amber-500 to-amber-600 border-amber-400",
-                  purple: "from-yellow-500 to-yellow-600 border-yellow-400",
-                };
-
-                return (
-                  <div key={block.blockNum} className="space-y-3">
-                    <div className="text-center">
-                      <h3 className="text-lg font-semibold text-gray-200 mb-1">
-                        {block.label}
-                      </h3>
-                      <p className="text-xs text-gray-300 mb-3">
-                        {block.description}
-                      </p>
-                    </div>
-
-                    <div
-                      className={`relative group cursor-pointer transition-all duration-300 ${
-                        block.isFocused
-                          ? "ring-2 ring-yellow-400 ring-opacity-60"
-                          : ""
-                      }`}
-                    >
-                      {/* Container for the progress bar */}
-                      <div className="bg-gray-800 rounded-lg p-4 border border-gray-700 hover:border-gray-600 transition-colors">
-                        {/* Progress bar container */}
-                        <div className="relative h-8 bg-gray-900 rounded-md overflow-hidden mb-3">
-                          {/* Progress fill */}
-                          <div
-                            className={`absolute top-0 left-0 h-full bg-gradient-to-r ${
-                              colorClasses[
-                                block.color as keyof typeof colorClasses
-                              ]
-                            } transition-all duration-1000 ease-out`}
-                            style={{ width: `${utilizationPercent}%` }}
-                          ></div>
-
-                          {/* Progress percentage text */}
-                          <div className="absolute inset-0 flex items-center justify-center">
-                            <span className="text-white font-bold text-sm drop-shadow-lg transition-all duration-500">
-                              {utilizationPercent.toFixed(1)}%
-                            </span>
-                          </div>
-                        </div>
-
-                        {/* Data display */}
-                        <div className="grid grid-cols-2 gap-3 text-center">
-                          <div className="bg-gray-700 rounded-md p-2">
-                            <div className="text-xs text-gray-300 mb-1">
-                              Current
-                            </div>
-                            <div className="text-lg font-bold text-white group-hover:text-yellow-100 transition-colors duration-300">
-                              {block.currentKWU}
-                              <span
-                                className="text-xs text-gray-300 group-hover:text-yellow-200 transition-colors duration-300"
-                                title="Kilo Weight Units - A measure of transaction weight in Bitcoin"
-                              >
-                                KWU
-                              </span>
-                            </div>
-                          </div>
-                          <div className="bg-gray-700 rounded-md p-2">
-                            <div className="text-xs text-gray-300 mb-1">
-                              Target
-                            </div>
-                            <div className="text-lg font-bold text-white group-hover:text-yellow-100 transition-colors duration-300">
-                              {block.targetKWU}
-                              <span
-                                className="text-xs text-gray-300 group-hover:text-yellow-200 transition-colors duration-300"
-                                title="Kilo Weight Units - A measure of transaction weight in Bitcoin"
-                              >
-                                KWU
-                              </span>
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Status indicator */}
-                        <div className="flex items-center justify-center mt-3">
-                          <div
-                            className={`w-2 h-2 rounded-full mr-2 ${
-                              block.isFocused
-                                ? "bg-yellow-400 animate-pulse"
-                                : "bg-gray-500"
-                            }`}
-                          ></div>
-                          <span className="text-xs text-gray-300">
-                            {block.isFocused
-                              ? "Active Block"
-                              : "Historical Data"}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
             </div>
 
             {/* Data Visualization */}
@@ -385,7 +271,8 @@ export default function DashboardPage() {
                   historical data
                 </span>{" "}
                 from past blocks to estimate fees. Can be slow to adapt to
-                changing conditions. Uses "economical" and "conservative" modes.
+                changing conditions. Uses &quot;economical&quot; and
+                &quot;conservative&quot; modes.
               </p>
             </div>
             <div className="group relative bg-gray-800/50 rounded-xl p-6 border border-yellow-500/20 hover:border-yellow-400/40 transition-all duration-300">

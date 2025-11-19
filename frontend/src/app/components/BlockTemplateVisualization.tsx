@@ -25,37 +25,6 @@ export default function BlockTemplateVisualization({
         setError(
           err instanceof Error ? err.message : "Failed to fetch block stats"
         );
-        // Set fallback data to prevent crashes
-        setBlockStats({
-          height: blockHeight,
-          time: Math.floor(Date.now() / 1000),
-          avgfee: 1000,
-          avgfeerate: 0.00001,
-          avgtxsize: 250,
-          blockhash:
-            "0000000000000000000000000000000000000000000000000000000000000000",
-          feerate_percentiles: [0.00001, 0.00002, 0.00005, 0.0001, 0.0002],
-          ins: 100,
-          maxfee: 5000,
-          maxfeerate: 0.0001,
-          maxtxsize: 1000,
-          medianfee: 1500,
-          mediantime: Math.floor(Date.now() / 1000),
-          mediantxsize: 300,
-          minfee: 100,
-          minfeerate: 0.000001,
-          mintxsize: 100,
-          outs: 120,
-          subsidy: 625000000,
-          swtotal_size: 100000,
-          swtotal_weight: 400000,
-          swtxs: 50,
-          total_out: 1000000000,
-          total_size: 1000000,
-          total_weight: 4000000,
-          totalfee: 1000000,
-          txs: 200,
-        });
       } finally {
         setLoading(false);
       }
