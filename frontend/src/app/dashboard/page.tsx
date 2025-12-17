@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useState, useEffect } from "react";
-import { api } from "@/lib/api";
+//import { api } from "@/lib/api";
 
 // Simple mempool data interface
 interface MempoolData {
@@ -19,7 +19,7 @@ export default function DashboardPage() {
   const [data, setData] = useState<MempoolData | null>(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
+  /*useEffect(() => {
     const fetchData = async () => {
       setLoading(true);
 
@@ -47,13 +47,13 @@ export default function DashboardPage() {
       }
 
       setLoading(false);
-    };
+    }; 
 
     fetchData();
     // Refresh every 30 seconds
     const interval = setInterval(fetchData, 30000);
     return () => clearInterval(interval);
-  }, []);
+  }, []); */
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-black to-gray-800 relative overflow-hidden">
@@ -86,11 +86,12 @@ export default function DashboardPage() {
                 <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-yellow-400 transition-all duration-300 group-hover:w-full"></span>
               </Link>
               <Link
-                href="/stats"
+                href="/dashboard/analytics"
                 className="text-gray-300 hover:text-yellow-400 transition-all duration-300 hover:scale-105 font-medium relative group"
               >
                 Analytics
                 <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-yellow-400 transition-all duration-300 group-hover:w-full"></span>
+               
               </Link>
             </nav>
           </div>
