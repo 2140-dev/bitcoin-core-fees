@@ -3,6 +3,9 @@
 import Link from "next/link";
 import { useState, useEffect } from "react";
 import { api } from "@/lib/api";
+import FeeRateTimeline from "@/app/components/FeeRateTimeline";
+import MempoolSizeChart from "@/app/components/MempoolSizeChart";
+import FeeDistributionChart from "@/app/components/FeeDistributionChart";
 
 // Simple mempool data interface
 interface MempoolData {
@@ -243,6 +246,27 @@ export default function DashboardPage() {
                   </div>
                   <div className="text-xs text-gray-400">latest block</div>
                 </div>
+              </div>
+            </div>
+
+            {/* D3.js Visualizations */}
+            <div className="space-y-8 mt-12">
+              <div className="text-center">
+                <h2 className="text-3xl font-bold text-white mb-2">
+                  Interactive Visualizations
+                </h2>
+                <p className="text-gray-400">
+                  Powered by D3.js for real-time data visualization
+                </p>
+              </div>
+
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <FeeRateTimeline />
+                <MempoolSizeChart />
+              </div>
+
+              <div className="grid grid-cols-1 gap-6">
+                <FeeDistributionChart />
               </div>
             </div>
           </div>

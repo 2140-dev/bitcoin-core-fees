@@ -9,6 +9,9 @@ import {
   type MempoolHealthResponse,
 } from "@/lib/api";
 import BlockTemplateVisualization from "@/app/components/BlockTemplateVisualization";
+import BlockStatsChartD3 from "@/app/components/BlockStatsChartD3";
+import FeeRateTimeline from "@/app/components/FeeRateTimeline";
+import FeeDistributionChart from "@/app/components/FeeDistributionChart";
 
 export default function StatsPage() {
   const [feeEstimate, setFeeEstimate] = useState<FeeEstimate | null>(null);
@@ -493,6 +496,41 @@ export default function StatsPage() {
             Block Template Analysis
           </h2>
           <BlockTemplateVisualization blockHeight={blockHeight} />
+        </div>
+
+        {/* D3.js Visualizations */}
+        {mempoolHealth && mempoolHealth.blocks.length > 0 && (
+          <div className="mt-12">
+            <h2 className="text-3xl font-bold text-center text-white mb-6">
+              Mempool Health Visualization (D3.js)
+            </h2>
+            <BlockStatsChartD3
+              blocks={mempoolHealth.blocks.map((b) => ({
+                height: b.height,
+                p25: b.p25 ?? 0,
+                p75: b.p75 ?? 0,
+                avgFee: b.avgFee ?? 0,
+                status: b.status,
+              }))}
+              startHeight={mempoolHealth.start_height}
+              endHeight={mempoolHealth.end_height}
+            />
+          </div>
+        )}
+
+        {/* Additional D3.js Charts */}
+        <div className="mt-12 space-y-8">
+          <div className="text-center">
+            <h2 className="text-3xl font-bold text-white mb-2">
+              Real-time Fee Visualizations
+            </h2>
+            <p className="text-gray-400">Interactive charts powered by D3.js</p>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <FeeRateTimeline />
+            <FeeDistributionChart />
+          </div>
         </div>
 
         {/* Performance Metrics (live from /analytics/summary) */}
