@@ -9,6 +9,7 @@ import {
   type UnifiedEstimate,
 } from "@/lib/api";
 import BlockStatsChartD3 from "@/app/components/BlockStatsChartD3";
+import MempoolHealthSummary from "@/app/components/MempoolHealthSummary";
 
 type ChartBlock = {
   height: number;
@@ -314,7 +315,6 @@ export default function DashboardPage() {
             {error}
           </div>
         )}
-
         <section>
           {loading ? (
             <div className="flex justify-center items-center h-64">
@@ -343,7 +343,12 @@ export default function DashboardPage() {
             </div>
           )}
         </section>
-
+        <section>
+          <MempoolHealthSummary 
+            summary={mempoolHealth?.summary ?? null}
+            loading={loading}
+          />
+        </section>
         <div className="mt-4 flex items-center justify-center space-x-3 text-gray-300">
           <div className="w-3 h-3 bg-green-400 rounded-full animate-pulse"></div>
           <span className="font-medium">
