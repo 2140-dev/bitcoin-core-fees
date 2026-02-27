@@ -104,7 +104,7 @@ def _get_single_block_stats_cached(height: int) -> tuple:
     Returns a frozen (JSON-serialised) snapshot so the lru_cache holds
     immutable data. Use get_single_block_stats() for normal access.
     """
-    result = _rpc_call("getblockstats", [height, ["height", "feerate_percentiles", "minfeerate", "maxfeerate"]])
+    result = _rpc_call("getblockstats", [height, ["height", "feerate_percentiles", "minfeerate", "maxfeerate", "total_weight"]])
     return json.dumps(result)  # freeze as string
 
 
@@ -121,12 +121,47 @@ def get_block_count() -> int:
     return _rpc_call("getblockcount", [])
 
 
+def get_mempool_health_statistics() -> List[Dict[str, Any]]:
+    """
+    Fetches stats for the last 5 blocks to compare their weights with 
+    the current mempool's readiness.
+    """
+    current_height = get_block_count()
+    stats = []
+    
+    # Using getmempoolfeeratediagram for accurate total weight
+    mempool_diagram = _rpc_call("getmempoolfeeratediagram", [])
+    total_mempool_weight = mempool_diagram[-1]["weight"] if mempool_diagram else 0
+
+    for h in range(current_height - 4, current_height + 1):
+        try:
+            b = get_single_block_stats(h)
+            weight = b.get("total_weight", 0)
+            
+            stats.append({
+                "block_height": h,
+                "block_weight": weight,
+                "mempool_txs_weight": total_mempool_weight,
+                "ratio": min(1.0, total_mempool_weight / 4_000_000)
+            })
+        except Exception:
+            continue
+    return stats
+
+
 def estimate_smart_fee(conf_target: int, mode: str = "unset", verbosity_level: int = 2) -> Dict[str, Any]:
     effective_target = _clamp_target(conf_target)
     result = _rpc_call("estimatesmartfee", [effective_target, mode, verbosity_level])
     if result and "feerate" in result:
         # feerate is BTC/kVB → sat/vB: × 1e8 (BTC→sat) ÷ 1e3 (kVB→vB) = × 1e5
         result["feerate_sat_per_vb"] = result["feerate"] * 100_000
+    
+    # Include health stats for the frontend
+    try:
+        result["mempool_health_statistics"] = get_mempool_health_statistics()
+    except Exception as e:
+        logger.error(f"Failed to include health stats: {e}")
+        
     return result
 
 

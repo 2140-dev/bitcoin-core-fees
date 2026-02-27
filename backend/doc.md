@@ -1,6 +1,6 @@
 # Backend - Bitcoin Core Fees API
 
-This service provides a Flask-based REST API to interact with Bitcoin Core RPC and provide fee analytics.
+This Flask-based REST API interacts with Bitcoin Core RPC and a local SQLite database to provide fee analytics and block statistics.
 
 ## Running the Application
 
@@ -15,18 +15,11 @@ pip install -r requirements.txt
 Ensure `rpc_config.ini` is configured with your Bitcoin Core RPC credentials.
 
 ### 2. Start the App (Background)
-To start the application and keep it running after you disconnect from the terminal, use the following `nohup` command:
+To start the application in the background:
 
 ```bash
-nohup .venv/bin/python app.py > debug.log 2>&1 &
+nohup env PYTHONPATH=src .venv/bin/gunicorn --workers 4 --bind 127.0.0.1:5001 app:app > debug.log 2>&1 &
 ```
-
-**What this command does:**
-*   `nohup`: Stands for "No Hang Up". It allows the command to continue running even after you logout or close the terminal.
-*   `.venv/bin/python app.py`: Executes the Flask app using the Python interpreter inside your virtual environment.
-*   `> debug.log`: Redirects standard output (logs) to a file named `debug.log`.
-*   `2>&1`: Redirects standard error (errors) to the same location as standard output (`debug.log`).
-*   `&`: Puts the command in the background, allowing you to continue using the terminal.
 
 ### 3. Monitoring Logs
 To see the logs in real-time:
@@ -35,35 +28,23 @@ tail -f debug.log
 ```
 
 ### 4. Stopping the App
-To stop the background process, you can find the Process ID (PID) and kill it, or use `pkill`:
-
-**Option A (Using pkill):**
+To stop the process:
 ```bash
-pkill -f "python app.py"
+pkill -f "gunicorn"
 ```
-
-**Option B (By Port):**
-```bash
-kill $(lsof -t -i:5001)
-```
-
-**Option C (Manual):**
-1. Find the PID: `ps aux | grep "python app.py"`
-2. Kill the process: `kill <PID>`
 
 ## API Endpoints
 
 | Endpoint | Method | Description |
 |----------|--------|-------------|
-| `/health` | GET | Check service and RPC connection status. |
-| `/blockchain/info` | GET | Get general info about the Bitcoin blockchain. |
-| `/blockcount` | GET | Get the current block height. |
-| `/mempool/info` | GET | Get current mempool state (size, bytes, etc.). |
-| `/fees/<target>/<mode>/<level>` | GET | Get `estimatesmartfee` from Bitcoin Core. |
-| `/fees/mempool` | GET | Get fee estimates based on current mempool percentiles. |
-| `/api/v1/fees/estimate` | GET | Unified endpoint for mempool, historical, or hybrid estimates. |
-| `/analytics/summary` | GET | Get summarized fee and block analytics (internal or external fallback). |
-| `/blockstats/<height>` | GET | Get detailed stats for a specific block height. |
-| `/external/block-stats/<count>` | GET | Proxy to external API for block statistics. |
-| `/external/fees-stats/<count>` | GET | Proxy to external API for fee statistics. |
-| `/external/fees-sum/<count>` | GET | Proxy to external API for fee summation analytics. |
+| `/blockcount` | GET | Current block height from node. |
+| `/fees/<target>/<mode>/<level>` | GET | `estimatesmartfee` results converted to sat/vB. |
+| `/mempool-diagram` | GET | Analyzed feerate diagram for mempool accumulation. |
+| `/performance-data/<start_block>/` | GET | Block feerate percentiles vs. recorded estimates. |
+| `/fees-sum/<start_block>/` | GET | Aggregated accuracy metrics (within, over, under). |
+
+### Parameters:
+- `target`: Confirmation target (e.g., 2, 7, 144).
+- `mode`: Fee estimation mode (`economical`, `conservative`, `unset`).
+- `level`: Verbosity level for fee estimation.
+- `start_block`: Block height to start range analysis from.

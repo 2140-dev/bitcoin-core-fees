@@ -8,7 +8,7 @@ logger = logging.getLogger("collector")
 _collector_started = False
 
 def run_collector():
-    logger.info("Starting high-resolution fee estimate collector (1s interval)...") 
+    logger.info("Starting high-resolution fee estimate collector (7s interval)...") 
     # 1 and 2 are the same, so we only poll 2
     targets = [2, 7, 144]
 
