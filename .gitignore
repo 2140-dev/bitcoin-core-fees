@@ -67,6 +67,18 @@ db.sqlite3-journal
 # Flask stuff:
 instance/
 .webassets-cache
+backend/rpc_config.ini
+backend/fee_analysis.db
+
+# Logs
+*.log
+nohup.out
+
+# Next.js
+frontend/.next/
+frontend/node_modules/
+frontend/frontend.log
+frontend/frontend.pd
 
 # Scrapy stuff:
 .scrapy
@@ -217,3 +229,6 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+fee_analysis.db
+
+.DS_Store
