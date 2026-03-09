@@ -1,11 +1,6 @@
 name: Tests
-
 on:
   push:
-    branches: [ "main", "feature/*" ]
-  pull_request:
-    branches: [ "main", "feature/*" ]
-
 jobs:
   backend-tests:
     runs-on: ubuntu-latest
@@ -24,9 +19,11 @@ jobs:
         pip install -r requirements.txt
         pip install pytest pytest-mock
     - name: Run tests
-      run: |
-        pytest tests/
-
+      run: pytest tests/
+      env:
+        RPC_URL: http://localhost:8332
+        RPC_USER: test
+        RPC_PASSWORD: test
   frontend-tests:
     runs-on: ubuntu-latest
     defaults:

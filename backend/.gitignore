@@ -4,5 +4,4 @@ test_secure_connection.py
 test_rpc_ports.py
 test_getbestblockhash.py
 
-rpc_config.ini
 
