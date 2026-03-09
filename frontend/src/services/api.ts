@@ -21,15 +21,17 @@ export interface MempoolDiagramResponse {
 }
 
 export class BitcoinCoreAPI {
-  private baseUrl: string = API_BASE_PATH;
-
-  constructor() {
+  private baseUrl: string;
+  constructor(baseUrl?: string) {
+    this.baseUrl = baseUrl ?? API_BASE_PATH;
     console.debug(`[API Service] Using relative proxy path: ${this.baseUrl}`);
   }
 
   private async fetchJson<T>(path: string, options?: RequestInit): Promise<T> {
     const cleanPath = path.replace(/^\/+/, "").replace(/\/+$/, "");
-    const url = `${this.baseUrl}/${cleanPath}`;
+    const url = this.baseUrl.startsWith("http")
+      ? `${this.baseUrl.replace(/\/+$/, "")}/${cleanPath}`
+      : `${this.baseUrl}/${cleanPath}`;
     try {
       const response = await fetch(url, options);
       if (!response.ok) {
