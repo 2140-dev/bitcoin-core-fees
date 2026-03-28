@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { NetworkBadge } from "./NetworkBadge";
 
 export function Header() {
   const pathname = usePathname();
@@ -18,31 +19,34 @@ export function Header() {
           </span>
         </Link>
         
-        <div className="flex gap-2 bg-[var(--background)] p-1.5 rounded-xl border border-[var(--card-border)] shadow-sm">
-          <Link 
-            href="/" 
-            className={`px-4 py-1.5 rounded-lg text-xs font-black transition-all ${
-              pathname === "/" ? "bg-[#F7931A] text-white shadow-md shadow-orange-500/20" : "text-[var(--muted)] hover:text-[var(--foreground)]"
-            }`}
-          >
-            Dashboard
-          </Link>
-          <Link 
-            href="/stats" 
-            className={`px-4 py-1.5 rounded-lg text-xs font-black transition-all ${
-              pathname === "/stats" ? "bg-[#F7931A] text-white shadow-md shadow-orange-500/20" : "text-[var(--muted)] hover:text-[var(--foreground)]"
-            }`}
-          >
-            Analytics
-          </Link>
-          <Link 
-            href="/mempool" 
-            className={`px-4 py-1.5 rounded-lg text-xs font-black transition-all ${
-              pathname === "/mempool" ? "bg-[#F7931A] text-white shadow-md shadow-orange-500/20" : "text-[var(--muted)] hover:text-[var(--foreground)]"
-            }`}
-          >
-            Mempool
-          </Link>
+        <div className="flex items-center gap-4">
+          <div className="flex gap-2 bg-[var(--background)] p-1.5 rounded-xl border border-[var(--card-border)] shadow-sm">
+            <Link 
+              href="/" 
+              className={`px-4 py-1.5 rounded-lg text-xs font-black transition-all ${
+                pathname === "/" ? "bg-[#F7931A] text-white shadow-md shadow-orange-500/20" : "text-[var(--muted)] hover:text-[var(--foreground)]"
+              }`}
+            >
+              Dashboard
+            </Link>
+            <Link 
+              href="/stats" 
+              className={`px-4 py-1.5 rounded-lg text-xs font-black transition-all ${
+                pathname === "/stats" ? "bg-[#F7931A] text-white shadow-md shadow-orange-500/20" : "text-[var(--muted)] hover:text-[var(--foreground)]"
+              }`}
+            >
+              Analytics
+            </Link>
+            <Link 
+              href="/mempool" 
+              className={`px-4 py-1.5 rounded-lg text-xs font-black transition-all ${
+                pathname === "/mempool" ? "bg-[#F7931A] text-white shadow-md shadow-orange-500/20" : "text-[var(--muted)] hover:text-[var(--foreground)]"
+              }`}
+            >
+              Mempool
+            </Link>
+          </div>
+          <NetworkBadge />
         </div>
       </div>
     </nav>

@@ -1,35 +1,37 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { api, MempoolDiagramResponse } from "../../services/api";
 import { Header } from "../../components/common/Header";
+import { useNetwork } from "../../context/NetworkContext";
 import MempoolDiagramChart from "../../components/mempool/MempoolDiagramChart";
 import { Activity, Database, AlertCircle, RefreshCw, Layers, TrendingUp, Scale, Database as DbIcon } from "lucide-react";
 
 export default function MempoolPage() {
+  const { chain } = useNetwork();
   const [data, setData] = useState<MempoolDiagramResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [blocksToShow, setBlocksToShow] = useState<number | "all">(1);
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
-      const result = await api.getMempoolDiagram();
+      const result = await api.getMempoolDiagram(chain);
       setData(result);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to fetch mempool diagram");
     } finally {
       setLoading(false);
     }
-  };
+  }, [chain]);
 
   useEffect(() => {
     fetchData();
     const interval = setInterval(fetchData, 30000);
     return () => clearInterval(interval);
-  }, []);
+  }, [fetchData]);
 
   const rawData = data?.raw || [];
   const currentWindowKey = blocksToShow.toString();

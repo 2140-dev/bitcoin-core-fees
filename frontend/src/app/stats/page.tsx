@@ -4,9 +4,11 @@ import { useState } from "react";
 import { BarChart3, TrendingUp, AlertCircle, CheckCircle2, Search, Activity, Database, ArrowRight, RefreshCw, Scale } from "lucide-react";
 import { useStats } from "../../hooks/useStats";
 import { Header } from "../../components/common/Header";
+import { useNetwork } from "../../context/NetworkContext";
 import FeeHistoryChart from "../../components/stats/FeeHistoryChart";
 
 export default function StatsPage() {
+  const { chain } = useNetwork();
   const [target, setTarget] = useState(2);
   const [scaleType, setScaleType] = useState<"log" | "linear">("linear");
   const {
@@ -22,7 +24,7 @@ export default function StatsPage() {
     latestBlock,
     handleApply,
     syncHeight
-  } = useStats(target);
+  } = useStats(target, chain);
 
   const handleStartChange = (val: number) => {
     setStartBlock(val);

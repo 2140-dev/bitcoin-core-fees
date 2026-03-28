@@ -5,10 +5,12 @@ import { api } from "../services/api";
 import { AlertCircle, BarChart2, Activity, Loader2, ChevronLeft, ChevronRight } from "lucide-react";
 import { FeeEstimateResponse, MempoolHealthStats } from "../types/api";
 import { Header } from "../components/common/Header";
+import { useNetwork } from "../context/NetworkContext";
 
 type FeeMode = "economical" | "conservative";
 
 export default function LandingPage() {
+  const { chain } = useNetwork();
   const [target, setTarget] = useState(2);
   const [mode, setMode] = useState<FeeMode>("economical");
   const [feeData, setFeeData] = useState<any>(null);
@@ -23,8 +25,7 @@ export default function LandingPage() {
       else setIsUpdating(true);
       
       setError(null);
-      // Backend automatically maps target <= 1 to 2
-      const data = await api.getFeeEstimate(confTarget, feeMode, 2);
+      const data = await api.getFeeEstimate(confTarget, feeMode, 2, chain);
       setFeeData(data);
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Failed to fetch fee data";
@@ -33,7 +34,7 @@ export default function LandingPage() {
       setInitialLoading(false);
       setIsUpdating(false);
     }
-  }, []);
+  }, [chain]);
 
   useEffect(() => {
     fetchFee(target, mode, true);
@@ -60,11 +61,6 @@ export default function LandingPage() {
         
         <div className="max-w-7xl mx-auto px-4 relative z-10 text-center">
           <div className="flex flex-col items-center mb-12">
-            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-[var(--card)] border border-[var(--card-border)] text-[var(--muted)] text-[10px] font-mono mb-6 uppercase tracking-widest shadow-sm">
-              <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
-              NETWORK: MAINNET
-            </div>
-            
             <div className="flex items-center gap-2 bg-[var(--card)] p-1 rounded-xl border border-[var(--card-border)] shadow-sm">
               {[2, 7, 144].map((t) => (
                 <button
