@@ -4,16 +4,37 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-DB_PATH = os.environ.get(
-    "DB_PATH",
-    os.path.join(os.path.dirname(os.path.abspath(__file__)), "fee_analysis.db")
+_BASE_DB_DIR = os.environ.get(
+    "DB_DIR",
+    os.path.dirname(os.path.abspath(__file__))
 )
+
+DB_FILENAME = "fee_analysis.db"
 
 MAX_RANGE_BLOCKS = 10_000  # safety cap on get_estimates_in_range
 
-def init_db():
+# Bitcoin Core–style subdirectories per network
+CHAIN_DIR_MAP = {
+    "main": "",
+    "test": "testnet3",
+    "testnet4": "testnet4",
+    "signet": "signet",
+    "regtest": "regtest",
+}
+
+
+def get_db_path(chain: str = "main") -> str:
+    """Return the DB file path for the given chain, creating parent dirs if needed."""
+    subdir = CHAIN_DIR_MAP.get(chain, chain)
+    directory = os.path.join(_BASE_DB_DIR, subdir) if subdir else _BASE_DB_DIR
+    os.makedirs(directory, exist_ok=True)
+    return os.path.join(directory, DB_FILENAME)
+
+
+def init_db(chain: str = "main"):
+    db_path = get_db_path(chain)
     try:
-        with sqlite3.connect(DB_PATH) as conn:
+        with sqlite3.connect(db_path) as conn:
             cursor = conn.cursor()
             cursor.execute('''
                 CREATE TABLE IF NOT EXISTS fee_estimates (
@@ -27,44 +48,44 @@ def init_db():
             ''')
             cursor.execute('CREATE INDEX IF NOT EXISTS idx_poll_height ON fee_estimates(poll_height)')
             cursor.execute('CREATE INDEX IF NOT EXISTS idx_target ON fee_estimates(target)')
-            # Composite index for the most common query pattern (poll_height + target together)
             cursor.execute('''
                 CREATE INDEX IF NOT EXISTS idx_poll_height_target
                 ON fee_estimates(poll_height, target)
             ''')
             conn.commit()
-        logger.info(f"Database initialised at {DB_PATH}")
+        logger.info(f"Database initialised at {db_path}")
     except sqlite3.Error as e:
         logger.error(f"Failed to initialise database: {e}", exc_info=True)
         raise
 
 
-def save_estimate(poll_height, target, feerate):
+def save_estimate(poll_height, target, feerate, chain="main"):
     expected_height = poll_height + target
+    db_path = get_db_path(chain)
     try:
-        with sqlite3.connect(DB_PATH) as conn:
+        with sqlite3.connect(db_path) as conn:
             cursor = conn.cursor()
             cursor.execute('''
                 INSERT INTO fee_estimates (poll_height, target, estimate_feerate, expected_height)
                 VALUES (?, ?, ?, ?)
             ''', (poll_height, target, feerate, expected_height))
             conn.commit()
-        logger.debug(f"Saved estimate: poll_height={poll_height}, target={target}, feerate={feerate}")
+        logger.debug(f"Saved estimate: poll_height={poll_height}, target={target}, feerate={feerate}, chain={chain}")
     except sqlite3.Error as e:
         logger.error(f"Failed to save estimate (poll_height={poll_height}, target={target}): {e}", exc_info=True)
         raise
 
 
-def get_estimates_in_range(start_height, end_height, target=2):
-    # Enforce a max block range to prevent runaway queries
+def get_estimates_in_range(start_height, end_height, target=2, chain="main"):
     if end_height - start_height > MAX_RANGE_BLOCKS:
         logger.warning(
             f"Requested range [{start_height}, {end_height}] exceeds MAX_RANGE_BLOCKS={MAX_RANGE_BLOCKS}. Clamping."
         )
         end_height = start_height + MAX_RANGE_BLOCKS
 
+    db_path = get_db_path(chain)
     try:
-        with sqlite3.connect(DB_PATH) as conn:
+        with sqlite3.connect(db_path) as conn:
             conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
             cursor.execute('''
@@ -84,9 +105,10 @@ def get_estimates_in_range(start_height, end_height, target=2):
         raise
 
 
-def get_db_height_range(target=2):
+def get_db_height_range(target=2, chain="main"):
+    db_path = get_db_path(chain)
     try:
-        with sqlite3.connect(DB_PATH) as conn:
+        with sqlite3.connect(db_path) as conn:
             cursor = conn.cursor()
             cursor.execute(
                 'SELECT MIN(poll_height), MAX(poll_height) FROM fee_estimates WHERE target = ?',
@@ -97,7 +119,6 @@ def get_db_height_range(target=2):
         if row and row[0] is None:
             logger.debug(f"No data in DB for target={target}")
 
-        # Return raw tuple — preserves existing caller contract
         return row
     except sqlite3.Error as e:
         logger.error(f"Failed to get DB height range: {e}", exc_info=True)
