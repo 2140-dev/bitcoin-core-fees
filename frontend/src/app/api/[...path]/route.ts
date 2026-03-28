@@ -10,6 +10,7 @@ const ALLOWED_PATH_ROOTS = new Set([
   "fees",
   "performance-data",
   "fees-sum",
+  "networks",
 ]);
 
 export async function GET(

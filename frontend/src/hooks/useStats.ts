@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { api } from "../services/api";
 import { AnalyticsSummary, MempoolHealthStats } from "../types/api";
 
-export function useStats(target: number = 2) {
+export function useStats(target: number = 2, chain?: string) {
   const [performanceData, setPerformanceData] = useState<{ blocks: any[]; estimates: any[] }>({ blocks: [], estimates: [] });
   const [summary, setSummary] = useState<AnalyticsSummary | null>(null);
   const [healthStats, setHealthStats] = useState<MempoolHealthStats[]>([]);
@@ -21,9 +21,9 @@ export function useStats(target: number = 2) {
       const count = Math.max(1, end - start);
       
       const [pData, fSum, feeEst] = await Promise.all([
-        api.getPerformanceData(start, count, confTarget),
-        api.getFeesSum(start, confTarget),
-        api.getFeeEstimate(confTarget, "unset", 2)
+        api.getPerformanceData(start, count, confTarget, chain),
+        api.getFeesSum(start, confTarget, chain),
+        api.getFeeEstimate(confTarget, "unset", 2, chain)
       ]);
 
       setPerformanceData(pData);
@@ -35,31 +35,39 @@ export function useStats(target: number = 2) {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [chain]);
 
   const syncHeight = useCallback(async () => {
     try {
-      const { blockcount } = await api.getBlockCount();
+      const { blockcount } = await api.getBlockCount(chain);
       setLatestBlock(blockcount);
       return blockcount;
     } catch (err) {
       return null;
     }
-  }, []);
+  }, [chain]);
 
+  // Reset default range and refetch whenever the chain changes (not only on first mount).
+  // If we only initialized when startBlock === null, switching networks would keep the old
+  // heights and never resync for the new chain.
   useEffect(() => {
+    if (!chain) return;
+    let cancelled = false;
     const init = async () => {
       const currentHeight = await syncHeight();
-      if (currentHeight && startBlock === null) {
-        const s = currentHeight - 100; // Default to 100 for clarity
-        const e = currentHeight;
-        setStartBlock(s);
-        setEndBlock(e);
-        fetchData(s, e, target);
-      }
+      if (cancelled || !currentHeight) return;
+      const s = currentHeight - 100;
+      const e = currentHeight;
+      setStartBlock(s);
+      setEndBlock(e);
+      fetchData(s, e, target);
     };
     init();
-  }, [syncHeight]);
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- target is applied via SYNC; only chain should reset range
+  }, [chain, syncHeight, fetchData]);
 
   const handleApply = () => {
     if (startBlock !== null && endBlock !== null) {

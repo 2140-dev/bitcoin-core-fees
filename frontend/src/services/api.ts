@@ -4,6 +4,7 @@ import {
   FeesStatsMap,
   BlockchainInfo,
   FeeEstimateResponse,
+  NetworkInfo,
 } from "../types/api";
 
 const API_BASE_PATH = "/api";
@@ -29,9 +30,8 @@ export class BitcoinCoreAPI {
 
   private async fetchJson<T>(path: string, options?: RequestInit): Promise<T> {
     const cleanPath = path.replace(/^\/+/, "").replace(/\/+$/, "");
-    const url = this.baseUrl.startsWith("http")
-      ? `${this.baseUrl.replace(/\/+$/, "")}/${cleanPath}`
-      : `${this.baseUrl}/${cleanPath}`;
+    const base = this.baseUrl.replace(/\/+$/, "");
+    const url = `${base}/${cleanPath}`;
     try {
       const response = await fetch(url, options);
       if (!response.ok) {
@@ -45,24 +45,39 @@ export class BitcoinCoreAPI {
     }
   }
 
-  async getFeeEstimate(target: number = 2, mode: string = "economical", level: number = 2): Promise<FeeEstimateResponse> {
-    return this.fetchJson<FeeEstimateResponse>(`fees/${target}/${mode}/${level}`);
+  private chainParam(chain?: string, existingParams?: string): string {
+    if (!chain) return existingParams ? `?${existingParams}` : "";
+    const sep = existingParams ? "&" : "";
+    return `?${existingParams || ""}${sep}chain=${chain}`;
   }
 
-  async getBlockCount(): Promise<BlockchainInfo> {
-    return this.fetchJson<BlockchainInfo>(`blockcount`);
+  async getNetworks(): Promise<NetworkInfo[]> {
+    return this.fetchJson<NetworkInfo[]>("networks");
   }
 
-  async getPerformanceData(startBlock: number, count: number = 100, target: number = 2): Promise<any> {
-    return this.fetchJson<any>(`performance-data/${startBlock}/?target=${target}&count=${count}`);
+  async getFeeEstimate(target: number = 2, mode: string = "economical", level: number = 2, chain?: string): Promise<FeeEstimateResponse> {
+    const q = chain ? `?chain=${chain}` : "";
+    return this.fetchJson<FeeEstimateResponse>(`fees/${target}/${mode}/${level}${q}`);
   }
 
-  async getFeesSum(startBlock: number, target: number = 2): Promise<AnalyticsSummary> {
-    return this.fetchJson<AnalyticsSummary>(`fees-sum/${startBlock}?target=${target}`);
+  async getBlockCount(chain?: string): Promise<BlockchainInfo> {
+    const q = chain ? `?chain=${chain}` : "";
+    return this.fetchJson<BlockchainInfo>(`blockcount${q}`);
   }
 
-  async getMempoolDiagram(): Promise<MempoolDiagramResponse> {
-    return this.fetchJson<MempoolDiagramResponse>(`mempool-diagram`);
+  async getPerformanceData(startBlock: number, count: number = 100, target: number = 2, chain?: string): Promise<any> {
+    const params = `target=${target}&count=${count}${chain ? `&chain=${chain}` : ""}`;
+    return this.fetchJson<any>(`performance-data/${startBlock}/?${params}`);
+  }
+
+  async getFeesSum(startBlock: number, target: number = 2, chain?: string): Promise<AnalyticsSummary> {
+    const params = `target=${target}${chain ? `&chain=${chain}` : ""}`;
+    return this.fetchJson<AnalyticsSummary>(`fees-sum/${startBlock}?${params}`);
+  }
+
+  async getMempoolDiagram(chain?: string): Promise<MempoolDiagramResponse> {
+    const q = chain ? `?chain=${chain}` : "";
+    return this.fetchJson<MempoolDiagramResponse>(`mempool-diagram${q}`);
   }
 }
 

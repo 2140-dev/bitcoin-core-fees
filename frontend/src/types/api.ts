@@ -21,6 +21,8 @@ export type FeesStatsMap = Record<string, number[]>;
 
 export interface BlockchainInfo {
   blockcount: number;
+  chain?: string;        // "main" | "test" | "signet" | "regtest"
+  chain_display?: string; // "MAINNET" | "TESTNET" | "SIGNET" | "REGTEST"
 }
 
 export interface MempoolHealthStats {
@@ -34,5 +36,12 @@ export interface FeeEstimateResponse {
   feerate: number;
   blocks: number;
   errors?: string[];
+  chain?: string;
+  chain_display?: string;
   mempool_health_statistics?: MempoolHealthStats[];
+}
+
+export interface NetworkInfo {
+  chain: string;
+  chain_display: string;
 }
