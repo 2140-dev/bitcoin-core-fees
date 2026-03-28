@@ -1,4 +1,5 @@
 import os
+import shutil
 import sqlite3
 import tempfile
 import unittest
@@ -7,31 +8,32 @@ import unittest
 class TestDatabaseService(unittest.TestCase):
 
     def setUp(self):
-        """Each test gets its own isolated temporary SQLite DB."""
-        self.tmp = tempfile.NamedTemporaryFile(suffix='.db', delete=False)
-        self.tmp.close()
+        """Each test gets its own isolated temporary directory as DB_DIR."""
+        self.tmpdir = tempfile.mkdtemp()
 
         import services.database_service as db
-        self._orig_path = db.DB_PATH
-        db.DB_PATH = self.tmp.name
+        self._orig_base_dir = db._BASE_DB_DIR
+        db._BASE_DB_DIR = self.tmpdir
         self.db = db
         self.db.init_db()
 
     def tearDown(self):
-        self.db.DB_PATH = self._orig_path
-        os.unlink(self.tmp.name)
+        self.db._BASE_DB_DIR = self._orig_base_dir
+        shutil.rmtree(self.tmpdir, ignore_errors=True)
 
     # --- init_db ------------------------------------------------------------
 
     def test_creates_table(self):
-        conn = sqlite3.connect(self.tmp.name)
+        db_path = self.db.get_db_path()
+        conn = sqlite3.connect(db_path)
         cursor = conn.cursor()
         cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='fee_estimates'")
         self.assertIsNotNone(cursor.fetchone())
         conn.close()
 
     def test_creates_all_indexes(self):
-        conn = sqlite3.connect(self.tmp.name)
+        db_path = self.db.get_db_path()
+        conn = sqlite3.connect(db_path)
         cursor = conn.cursor()
         cursor.execute("SELECT name FROM sqlite_master WHERE type='index'")
         index_names = {row[0] for row in cursor.fetchall()}
@@ -47,6 +49,62 @@ class TestDatabaseService(unittest.TestCase):
         except Exception as e:
             self.fail(f"init_db raised on repeated call: {e}")
 
+    # --- per-network directory isolation ------------------------------------
+
+    def test_mainnet_db_at_root(self):
+        path = self.db.get_db_path("main")
+        self.assertEqual(path, os.path.join(self.tmpdir, "fee_analysis.db"))
+
+    def test_testnet_db_in_testnet3(self):
+        self.db.init_db("test")
+        path = self.db.get_db_path("test")
+        self.assertEqual(path, os.path.join(self.tmpdir, "testnet3", "fee_analysis.db"))
+        self.assertTrue(os.path.isfile(path))
+
+    def test_signet_db_in_signet(self):
+        self.db.init_db("signet")
+        path = self.db.get_db_path("signet")
+        self.assertEqual(path, os.path.join(self.tmpdir, "signet", "fee_analysis.db"))
+        self.assertTrue(os.path.isfile(path))
+
+    def test_regtest_db_in_regtest(self):
+        self.db.init_db("regtest")
+        path = self.db.get_db_path("regtest")
+        self.assertEqual(path, os.path.join(self.tmpdir, "regtest", "fee_analysis.db"))
+        self.assertTrue(os.path.isfile(path))
+
+    def test_testnet4_db_in_testnet4(self):
+        self.db.init_db("testnet4")
+        path = self.db.get_db_path("testnet4")
+        self.assertEqual(path, os.path.join(self.tmpdir, "testnet4", "fee_analysis.db"))
+        self.assertTrue(os.path.isfile(path))
+
+    def test_networks_are_isolated(self):
+        """Data written to one network is invisible to another."""
+        self.db.init_db("test")
+        self.db.save_estimate(800000, target=2, feerate=15.5, chain="main")
+        self.db.save_estimate(800000, target=2, feerate=99.0, chain="test")
+
+        main_rows = self.db.get_estimates_in_range(800000, 800000, target=2, chain="main")
+        test_rows = self.db.get_estimates_in_range(800000, 800000, target=2, chain="test")
+
+        self.assertEqual(len(main_rows), 1)
+        self.assertAlmostEqual(main_rows[0]['estimate_feerate'], 15.5)
+        self.assertEqual(len(test_rows), 1)
+        self.assertAlmostEqual(test_rows[0]['estimate_feerate'], 99.0)
+
+    def test_all_networks_are_isolated(self):
+        """Each chain's DB is independent from every other chain."""
+        chains = ["main", "test", "testnet4", "signet", "regtest"]
+        for c in chains:
+            self.db.init_db(c)
+            self.db.save_estimate(100, target=2, feerate=float(chains.index(c) + 1), chain=c)
+
+        for c in chains:
+            rows = self.db.get_estimates_in_range(100, 100, target=2, chain=c)
+            self.assertEqual(len(rows), 1, msg=f"Expected 1 row for {c}")
+            self.assertAlmostEqual(rows[0]['estimate_feerate'], float(chains.index(c) + 1))
+
     # --- save_estimate / get_estimates_in_range -----------------------------
 
     def test_save_and_retrieve(self):
@@ -58,7 +116,8 @@ class TestDatabaseService(unittest.TestCase):
 
     def test_expected_height_computed_correctly(self):
         self.db.save_estimate(poll_height=800000, target=7, feerate=10.0)
-        conn = sqlite3.connect(self.tmp.name)
+        db_path = self.db.get_db_path()
+        conn = sqlite3.connect(db_path)
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
         cursor.execute('SELECT expected_height FROM fee_estimates WHERE poll_height=800000')
