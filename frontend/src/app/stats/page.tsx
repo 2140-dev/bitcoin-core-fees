@@ -206,7 +206,6 @@ function SummaryCard({ title, value, percent, icon, colorClass, bgColorClass, to
           <span className={`text-3xl font-black tracking-tight ${colorClass}`}>
             {percent !== undefined ? (percent * 100).toFixed(1) : "0"}%
           </span>
-          <div className="text-[9px] font-mono text-[var(--muted)] uppercase tracking-widest mt-1">Accuracy</div>
         </div>
       </div>
       <h3 className="text-[var(--muted)] text-[10px] font-bold uppercase tracking-[0.2em]">{title}</h3>
