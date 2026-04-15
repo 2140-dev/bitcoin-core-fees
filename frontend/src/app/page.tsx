@@ -211,14 +211,15 @@ function FeeCard({ label, target, data, loading, updating }: {
 
 function HealthBlock({ stat }: { stat: MempoolHealthStats }) {
   const ratio = stat.ratio;
-  const color = ratio > 0.95 ? "bg-green-500" : ratio > 0.7 ? "bg-orange-500" : "bg-red-500";
+  // ratio = mempool_weight / 4_000_000 (block-equivalents waiting)
+  const color = ratio < 1 ? "bg-green-500" : ratio < 5 ? "bg-orange-500" : "bg-red-500";
 
   return (
     <div className="min-w-[300px] p-6 bg-[var(--card)] rounded-2xl border border-[var(--card-border)] snap-start hover:border-orange-500/30 transition-all shadow-sm">
       <div className="flex justify-between items-center mb-5 text-left">
         <span className="text-[11px] font-mono text-[var(--muted)] font-bold uppercase">Block {stat.block_height}</span>
         <span className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full ${color} text-white shadow-sm`}>
-          {(ratio * 100).toFixed(1)}%
+          {ratio.toFixed(1)}x
         </span>
       </div>
 
