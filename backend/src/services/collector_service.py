@@ -53,5 +53,7 @@ def start_background_collectors():
         logger.info(f"Collector thread started for {chain}")
 
 
-# Keep old name as alias for backward compat (tests, existing callers)
-start_background_collector = start_background_collectors
+def reset_collectors():
+    """Reset the started flag. Only call this in tests."""
+    global _collectors_started
+    _collectors_started = False
