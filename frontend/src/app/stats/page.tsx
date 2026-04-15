@@ -167,9 +167,9 @@ export default function StatsPage() {
               </h2>
               <p className="text-[10px] uppercase font-bold text-[var(--muted)] mt-1 tracking-widest">p10 to p90 block fee distribution</p>
             </div>
-            <div className="flex gap-4 text-[9px] font-black uppercase tracking-widest text-[var(--muted)] bg-[var(--background)] px-4 py-2 rounded-lg border border-[var(--card-border)]">
-              <div className="flex items-center gap-1.5"><div className="w-2.5 h-2.5 bg-gray-400/50 rounded-sm"></div> p10-p90</div>
-              <div className="flex items-center gap-1.5"><div className="w-2.5 h-0.5 bg-[#3b82f6]"></div> Fee Estimate</div>
+            <div className="flex gap-4 text-[9px] font-medium uppercase tracking-wider text-[var(--muted)] bg-[var(--surface-2)] px-4 py-2 rounded-lg border border-[var(--card-border)]">
+              <div className="flex items-center gap-1.5"><div className="w-2.5 h-2.5 bg-[var(--muted)] opacity-40 rounded-sm"></div> p10–p90 range</div>
+              <div className="flex items-center gap-1.5"><div className="w-2.5 h-0.5 bg-[var(--data-blue)] rounded-full"></div> Fee estimate</div>
             </div>
           </div>
           
@@ -203,14 +203,15 @@ function SummaryCard({ title, value, percent, icon, colorClass, bgColorClass, to
       <div className="flex justify-between items-start mb-6">
         <div className={`p-3.5 ${bgColorClass} rounded-2xl shadow-inner`}>{icon}</div>
         <div className="text-right">
-          <span className={`text-3xl font-black tracking-tight ${colorClass}`}>
+          <span className={`text-3xl font-black tabular-nums font-mono tracking-tight ${colorClass}`}>
             {percent !== undefined ? (percent * 100).toFixed(1) : "0"}%
           </span>
         </div>
       </div>
-      <h3 className="text-[var(--muted)] text-[10px] font-bold uppercase tracking-[0.2em]">{title}</h3>
-      <p className="text-2xl font-bold mt-1 font-mono tracking-tighter">
-        {value || 0} / {total || 0} <span className="text-xs font-normal text-[var(--muted)] lowercase">estimates</span>
+      <h3 className="text-[var(--muted)] text-[11px] font-semibold uppercase tracking-widest">{title}</h3>
+      <p className="text-xl font-semibold mt-1 font-mono tabular-nums">
+        {value || 0} <span className="text-[var(--muted)] font-normal">/ {total || 0}</span>
+        <span className="text-xs font-normal text-[var(--muted)] ml-1">estimates</span>
       </p>
     </div>
   );

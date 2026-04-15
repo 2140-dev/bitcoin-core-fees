@@ -5,49 +5,92 @@
   --font-mono: var(--font-geist-mono);
 }
 
+/* ── Design tokens ─────────────────────────────────────────────────────────── */
+
 :root {
-  --background: #ffffff;
-  --foreground: #0f172a;
-  --card: #f8fafc;
+  /* Surfaces */
+  --background:  #ffffff;
+  --surface:     #f8fafc;   /* cards, panels */
+  --surface-2:   #f1f5f9;   /* inset areas, inputs */
+  --card:        #f8fafc;
   --card-border: #e2e8f0;
-  --muted: #64748b;
-  --accent: #f97316;
+
+  /* Text */
+  --foreground:       #0f172a;
+  --text-secondary:   #374151;   /* subheadings, labels */
+  --muted:            #6b7280;   /* de-emphasised content */
+
+  /* Brand */
+  --accent:      #f97316;   /* bitcoin orange — reserve for brand/CTAs only */
+  --accent-dim:  #fed7aa;   /* accent background tint */
+
+  /* Data colours — distinct from brand orange */
+  --data-blue:   #3b82f6;   /* fee estimate line */
+  --data-blue-dim: #dbeafe;
+
+  /* Chart internals */
+  --chart-bg:    #f1f5f9;
+  --chart-grid:  #ffffff;
+  --chart-text:  #6b7280;
+  --chart-axis:  #94a3b8;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #020617;
-    --foreground: #f8fafc;
-    --card: #0f172a;
-    --card-border: #1e293b;
-    --muted: #94a3b8;
-    --accent: #f97316;
+    /* Surfaces — zinc scale (warmer than slate, less blue cast) */
+    --background:  #09090b;   /* zinc-950 */
+    --surface:     #18181b;   /* zinc-900 */
+    --surface-2:   #27272a;   /* zinc-800 */
+    --card:        #18181b;
+    --card-border: #3f3f46;   /* zinc-700 — enough contrast to see borders */
+
+    /* Text */
+    --foreground:       #fafafa;   /* zinc-50 */
+    --text-secondary:   #d4d4d8;   /* zinc-300 */
+    --muted:            #71717a;   /* zinc-500 */
+
+    /* Brand */
+    --accent:      #f97316;
+    --accent-dim:  #431407;
+
+    /* Data */
+    --data-blue:   #60a5fa;   /* blue-400, brighter on dark bg */
+    --data-blue-dim: #1e3a5f;
+
+    /* Chart internals */
+    --chart-bg:    #27272a;   /* zinc-800 */
+    --chart-grid:  #3f3f46;   /* zinc-700 */
+    --chart-text:  #a1a1aa;   /* zinc-400 */
+    --chart-axis:  #52525b;   /* zinc-600 */
   }
 }
+
+/* ── Base ──────────────────────────────────────────────────────────────────── */
 
 body {
   background: var(--background);
   color: var(--foreground);
   font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
   transition: background-color 0.3s, color 0.3s;
 }
 
-.custom-scrollbar::-webkit-scrollbar {
-  height: 4px;
+/* Tabular figures everywhere numbers are displayed — prevents layout shift */
+.font-mono,
+.tabular {
+  font-variant-numeric: tabular-nums;
 }
 
-.custom-scrollbar::-webkit-scrollbar-track {
-  background: transparent;
-}
+/* ── Scrollbars ────────────────────────────────────────────────────────────── */
 
+.custom-scrollbar::-webkit-scrollbar { height: 4px; }
+.custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
 .custom-scrollbar::-webkit-scrollbar-thumb {
   background: var(--card-border);
   border-radius: 10px;
 }
 
-.no-scrollbar::-webkit-scrollbar {
-  display: none;
-}
+.no-scrollbar::-webkit-scrollbar { display: none; }
 .no-scrollbar {
   -ms-overflow-style: none;
   scrollbar-width: none;
