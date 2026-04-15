@@ -3,6 +3,7 @@ import itertools
 import json
 import os
 import logging
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any, Dict, List, Optional
 from functools import lru_cache
 
@@ -57,7 +58,7 @@ class RpcClient:
             "params": params,
             "id": next(_rpc_id_counter),
         })
-        auth = (self._user, self._password) if (self._user or self._password) else None
+        auth = (self._user, self._password) if (self._user and self._password) else None
         try:
             response = self._session.post(
                 self._url, data=payload, auth=auth, timeout=DEFAULT_TIMEOUT_SECONDS,
@@ -153,8 +154,12 @@ class RpcClient:
 
         def _window_percentiles(weight_limit: int) -> Dict[str, float]:
             actual_limit = min(weight_limit, max_weight)
+            # The diagram orders transactions highest-feerate first, so the
+            # weight position p corresponds to feerate percentile (1-p).
+            # Label by feerate percentile to match getblockstats convention
+            # where p10=cheap and p90=expensive.
             return {
-                str(int(p * 100)): _feerate_at_weight(p * actual_limit)
+                str(int((1 - p) * 100)): _feerate_at_weight(p * actual_limit)
                 for p in (0.05, 0.25, 0.50, 0.75, 0.95)
             }
 
@@ -172,6 +177,49 @@ class RpcClient:
             "total_fee": raw_points[-1]["fee"],
         }
 
+    # Maximum RPC threads we'll use for parallel block-stats fetching.
+    # Bitcoin Core's default rpcthreads=16; we leave headroom for the
+    # background collector and any concurrent API requests.
+    _BLOCK_FETCH_WORKERS = 8
+
+    def _fetch_block_stats_parallel(self, heights: List[int]) -> Dict[int, Any]:
+        """Fetch getblockstats for a list of heights in parallel.
+
+        Returns a dict mapping height → parsed stats for every height that
+        succeeded.  Heights that fail (node unavailable, not yet mined, etc.)
+        are omitted — callers must handle missing keys gracefully.
+
+        Thread-safety notes:
+        - lru_cache on _get_single_block_stats_cached is thread-safe in
+          CPython: the GIL serialises cache reads/writes and the underlying
+          dict operations are atomic.  A cache stampede (two threads fetching
+          the same uncached height simultaneously) is harmless because
+          getblockstats is idempotent.
+        - requests.Session: we never mutate session-level state (cookies,
+          headers, auth) after construction, so concurrent POST calls through
+          the same session are safe — urllib3's connection pool handles
+          concurrency internally.
+        """
+        if not heights:
+            return {}
+
+        results: Dict[int, Any] = {}
+
+        def _fetch(h: int) -> tuple[int, Any]:
+            return h, self.get_single_block_stats(h)
+
+        with ThreadPoolExecutor(max_workers=min(self._BLOCK_FETCH_WORKERS, len(heights))) as pool:
+            futures = {pool.submit(_fetch, h): h for h in heights}
+            for future in as_completed(futures):
+                h = futures[future]
+                try:
+                    _, stats = future.result()
+                    results[h] = stats
+                except Exception:
+                    logger.debug(f"Skipping block stats for height {h} — RPC unavailable")
+
+        return results
+
     def get_performance_data(self, start_height: int, count: int = 100, target: int = 2) -> Dict[str, Any]:
         import services.database_service as db_service
 
@@ -183,15 +231,16 @@ class RpcClient:
         latest_estimates_map = {row["poll_height"]: row["estimate_feerate"] for row in db_rows}
         estimates = [{"height": h, "rate": latest_estimates_map[h]} for h in sorted(latest_estimates_map)]
 
+        heights = list(range(start_height, start_height + count))
+        block_stats = self._fetch_block_stats_parallel(heights)
+
         blocks = []
-        for h in range(start_height, start_height + count):
-            try:
-                b = self.get_single_block_stats(h)
-                p = b.get("feerate_percentiles", [0, 0, 0, 0, 0])
-                blocks.append({"height": h, "low": p[0], "high": p[4]})
-            except Exception:
-                logger.debug(f"Skipping block stats for height {h} — RPC unavailable")
+        for h in heights:
+            stats = block_stats.get(h)
+            if stats is None:
                 continue
+            p = stats.get("feerate_percentiles", [0, 0, 0, 0, 0])
+            blocks.append({"height": h, "low": p[0], "high": p[4]})
 
         return {"blocks": blocks, "estimates": estimates}
 
@@ -205,20 +254,39 @@ class RpcClient:
             start_h, current_h, effective_target, chain=self.chain,
         )
 
+        # Identify rows whose confirmation window has fully closed, and collect
+        # every block height we will need to evaluate them.  We gather all
+        # heights upfront so we can warm the lru_cache in one parallel burst
+        # before the sequential classification loop below.
+        valid_rows = []
+        needed_heights: set[int] = set()
+        for row in db_rows:
+            window_end = row["poll_height"] + row["target"]
+            if window_end > current_h:
+                continue
+            valid_rows.append(row)
+            needed_heights.update(range(row["poll_height"] + 1, window_end + 1))
+
+        # Warm the cache in parallel.  Any heights already cached are returned
+        # instantly without an RPC call, so this is safe to call even when
+        # get_performance_data has already been called for the same range.
+        self._fetch_block_stats_parallel(list(needed_heights))
+
+        # Classify each row sequentially.  The classification logic carries
+        # per-row mutable state (is_under / is_over) that depends on the
+        # ordered evaluation of multiple blocks, so we keep this loop serial.
+        # All get_single_block_stats calls here are guaranteed cache hits.
         total = over = under = within = 0
 
-        for row in db_rows:
+        for row in valid_rows:
             poll_h = row["poll_height"]
             target_val = row["target"]
             est = row["estimate_feerate"]
             window_end = poll_h + target_val
 
-            if window_end > current_h:
-                continue
-
-            total += 1
             is_under = True
             is_over = False
+            total += 1
 
             for h in range(poll_h + 1, window_end + 1):
                 try:
@@ -230,7 +298,6 @@ class RpcClient:
                         is_over = True
                 except Exception:
                     logger.debug(f"Skipping block {h} in summary calculation — RPC unavailable")
-                    continue
 
             if is_under:
                 under += 1
@@ -381,16 +448,8 @@ def get_client(chain: Optional[str] = None) -> RpcClient:
     return _get_registry().get_client(chain)
 
 
-def get_current_chain() -> str:
-    return registry.default_chain
-
-
 def get_available_chains() -> List[Dict[str, str]]:
     return registry.available_chains()
-
-
-def get_block_count(chain: Optional[str] = None) -> int:
-    return get_client(chain).get_block_count()
 
 
 def get_blockchain_info(chain: Optional[str] = None) -> Dict[str, Any]:
