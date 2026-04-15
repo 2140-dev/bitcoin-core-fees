@@ -1,6 +1,7 @@
 import logging
 import os
 from flask import Flask, jsonify, request
+from flask_compress import Compress
 from flask_cors import CORS
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
@@ -18,6 +19,7 @@ logger = logging.getLogger(__name__)
 def create_app():
     app = Flask(__name__)
     app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
+    Compress(app)
     CORS(app)
 
     limiter = Limiter(
