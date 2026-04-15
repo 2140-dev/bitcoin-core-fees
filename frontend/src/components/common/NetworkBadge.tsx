@@ -18,11 +18,15 @@ function getStyle(chain: string) {
   return CHAIN_STYLES[chain] ?? DEFAULT_STYLE;
 }
 
-interface NetworkSwitcherProps {
+interface NetworkBadgeProps {
   className?: string;
 }
 
-export function NetworkBadge({ className = "" }: NetworkSwitcherProps) {
+function toTitleCase(s: string) {
+  return s.charAt(0) + s.slice(1).toLowerCase();
+}
+
+export function NetworkBadge({ className = "" }: NetworkBadgeProps) {
   const { chain, chainDisplay, networks, setChain, loading } = useNetwork();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -37,7 +41,7 @@ export function NetworkBadge({ className = "" }: NetworkSwitcherProps) {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  if (loading || networks.length === 0) {
+  if (loading) {
     return (
       <div className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-[var(--card)] border border-[var(--card-border)] text-[var(--muted)] text-xs font-bold ${className}`.trim()}>
         <div className="w-2 h-2 rounded-full bg-yellow-500 animate-pulse" />
@@ -46,14 +50,27 @@ export function NetworkBadge({ className = "" }: NetworkSwitcherProps) {
     );
   }
 
-  const style = getStyle(chain ?? "main");
-  const label = chainDisplay.charAt(0) + chainDisplay.slice(1).toLowerCase();
+  if (networks.length === 0) {
+    return (
+      <div className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-[var(--card)] border border-[var(--card-border)] text-red-400 text-xs font-bold ${className}`.trim()}>
+        <div className="w-2 h-2 rounded-full bg-red-400" />
+        Unavailable
+      </div>
+    );
+  }
+
+  const style = chain ? getStyle(chain) : DEFAULT_STYLE;
+  const label = toTitleCase(chainDisplay);
   const hasMultiple = networks.length > 1;
 
   return (
     <div ref={ref} className={`relative ${className}`.trim()}>
       <button
+        type="button"
         onClick={() => hasMultiple && setOpen((prev) => !prev)}
+        aria-haspopup={hasMultiple ? "listbox" : undefined}
+        aria-expanded={hasMultiple ? open : undefined}
+        aria-disabled={!hasMultiple}
         className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg ${style.bg} border ${style.border} ${style.text} text-xs font-bold transition-all ${hasMultiple ? "cursor-pointer hover:opacity-80" : "cursor-default"}`}
       >
         <div className={`w-2 h-2 rounded-full ${style.dot} animate-pulse`} />
@@ -64,14 +81,17 @@ export function NetworkBadge({ className = "" }: NetworkSwitcherProps) {
       </button>
 
       {open && hasMultiple && (
-        <div className="absolute right-0 top-full mt-2 min-w-[160px] bg-[var(--card)] border border-[var(--card-border)] rounded-xl shadow-xl overflow-hidden z-50">
+        <div role="listbox" className="absolute right-0 top-full mt-2 min-w-[160px] bg-[var(--card)] border border-[var(--card-border)] rounded-xl shadow-xl overflow-hidden z-50">
           {networks.map((n) => {
             const s = getStyle(n.chain);
             const isActive = n.chain === chain;
-            const name = n.chain_display.charAt(0) + n.chain_display.slice(1).toLowerCase();
+            const name = toTitleCase(n.chain_display);
             return (
               <button
                 key={n.chain}
+                type="button"
+                role="option"
+                aria-selected={isActive}
                 onClick={() => { setChain(n.chain); setOpen(false); }}
                 className={`w-full flex items-center gap-2.5 px-4 py-2.5 text-left text-sm font-bold transition-colors ${
                   isActive
