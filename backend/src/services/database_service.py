@@ -24,15 +24,15 @@ CHAIN_DIR_MAP = {
 
 
 def get_db_path(chain: str = "main") -> str:
-    """Return the DB file path for the given chain, creating parent dirs if needed."""
+    """Return the DB file path for the given chain (pure lookup, no side effects)."""
     subdir = CHAIN_DIR_MAP.get(chain, chain)
     directory = os.path.join(_BASE_DB_DIR, subdir) if subdir else _BASE_DB_DIR
-    os.makedirs(directory, exist_ok=True)
     return os.path.join(directory, DB_FILENAME)
 
 
 def init_db(chain: str = "main"):
     db_path = get_db_path(chain)
+    os.makedirs(os.path.dirname(db_path), exist_ok=True)
     try:
         with sqlite3.connect(db_path) as conn:
             cursor = conn.cursor()

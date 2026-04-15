@@ -22,8 +22,7 @@ def make_app():
     with patch('services.rpc_service._registry', mock_reg), \
          patch('services.rpc_service._get_registry', return_value=mock_reg), \
          patch('services.database_service.init_db', return_value=None), \
-         patch('services.collector_service.start_background_collectors', return_value=None), \
-         patch('services.collector_service.start_background_collector', return_value=None):
+         patch('services.collector_service.start_background_collectors', return_value=None):
         from app import create_app
         app = create_app()
         app.config['TESTING'] = True
