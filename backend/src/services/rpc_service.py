@@ -96,23 +96,24 @@ class RpcClient:
         return result
 
     def get_mempool_health_statistics(self) -> List[Dict[str, Any]]:
-        current_height = self.get_block_count()
+        # estimatesmartfee verbosity 2 (PR #34075) returns per-block mempool
+        # stats directly — mempool_txs_weight is the weight of mempool
+        # transactions included in each block, not the live mempool total.
+        result = self.rpc_call("estimatesmartfee", [2, "unset", 2])
+        if not result:
+            return []
+        raw_stats = result.get("mempool_health_statistics", [])
         stats = []
-        mempool_diagram = self.rpc_call("getmempoolfeeratediagram", [])
-        total_mempool_weight = mempool_diagram[-1]["weight"] if mempool_diagram else 0
-
-        for h in range(current_height - 4, current_height + 1):
-            try:
-                b = self.get_single_block_stats(h)
-                weight = b.get("total_weight", 0)
-                stats.append({
-                    "block_height": h,
-                    "block_weight": weight,
-                    "mempool_txs_weight": total_mempool_weight,
-                    "ratio": min(1.0, total_mempool_weight / 4_000_000),
-                })
-            except Exception:
-                continue
+        for entry in raw_stats:
+            block_weight = entry.get("block_weight", 0)
+            mempool_txs_weight = entry.get("mempool_txs_weight", 0)
+            ratio = min(1.0, mempool_txs_weight / block_weight) if block_weight > 0 else 0.0
+            stats.append({
+                "block_height": entry["block_height"],
+                "block_weight": block_weight,
+                "mempool_txs_weight": mempool_txs_weight,
+                "ratio": ratio,
+            })
         return stats
 
     @lru_cache(maxsize=2000)
