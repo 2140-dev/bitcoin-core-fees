@@ -87,6 +87,16 @@ class TestApp(unittest.TestCase):
         r = self.client.get('/mempool-diagram?chain=fakenet')
         self.assertEqual(r.status_code, 400)
 
+    def test_unknown_chain_returns_400_on_performance_data(self):
+        r = self.client.get('/performance-data/800000/?chain=fakenet')
+        self.assertEqual(r.status_code, 400)
+        self.assertIn('error', r.json)
+
+    def test_unknown_chain_returns_400_on_fees_sum(self):
+        r = self.client.get('/fees-sum/800000/?chain=fakenet')
+        self.assertEqual(r.status_code, 400)
+        self.assertIn('error', r.json)
+
     # --- /fees/<target>/<mode>/<level> with ?chain= -------------------------
 
     @patch('services.rpc_service.estimate_smart_fee', return_value={"feerate": 0.0001, "blocks": 2})
