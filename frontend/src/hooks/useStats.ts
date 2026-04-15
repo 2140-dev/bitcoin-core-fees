@@ -56,7 +56,7 @@ export function useStats(target: number = 2, chain?: string) {
     const init = async () => {
       const currentHeight = await syncHeight();
       if (cancelled || !currentHeight) return;
-      const s = currentHeight - 100;
+      const s = currentHeight - 1000;
       const e = currentHeight;
       setStartBlock(s);
       setEndBlock(e);
