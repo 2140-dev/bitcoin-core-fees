@@ -1,26 +1,14 @@
 import {
   AnalyticsSummary,
-  BlockStatsMap,
-  FeesStatsMap,
   BlockchainInfo,
   FeeEstimateResponse,
+  MempoolDiagramResponse,
   MempoolHealthStats,
   NetworkInfo,
+  PerformanceData,
 } from "../types/api";
 
 const API_BASE_PATH = "/api";
-
-export interface MempoolDiagramPoint {
-  weight: number;
-  fee: number;
-}
-
-export interface MempoolDiagramResponse {
-  raw: MempoolDiagramPoint[];
-  windows: Record<string, Record<string, number>>;
-  total_weight: number;
-  total_fee: number;
-}
 
 export class BitcoinCoreAPI {
   private baseUrl: string;
@@ -60,9 +48,9 @@ export class BitcoinCoreAPI {
     return this.fetchJson<BlockchainInfo>(`blockcount${q}`);
   }
 
-  async getPerformanceData(startBlock: number, count: number = 100, target: number = 2, chain?: string): Promise<any> {
+  async getPerformanceData(startBlock: number, count: number = 100, target: number = 2, chain?: string): Promise<PerformanceData> {
     const params = `target=${target}&count=${count}${chain ? `&chain=${chain}` : ""}`;
-    return this.fetchJson<any>(`performance-data/${startBlock}/?${params}`);
+    return this.fetchJson<PerformanceData>(`performance-data/${startBlock}/?${params}`);
   }
 
   async getFeesSum(startBlock: number, target: number = 2, chain?: string): Promise<AnalyticsSummary> {

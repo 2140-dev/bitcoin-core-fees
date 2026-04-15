@@ -12,13 +12,7 @@ interface NetworkContextValue {
   loading: boolean;
 }
 
-const NetworkContext = createContext<NetworkContextValue>({
-  chain: undefined,
-  chainDisplay: "MAINNET",
-  networks: [],
-  setChain: () => {},
-  loading: true,
-});
+const NetworkContext = createContext<NetworkContextValue | null>(null);
 
 export function NetworkProvider({ children }: { children: ReactNode }) {
   const [networks, setNetworks] = useState<NetworkInfo[]>([]);
@@ -33,7 +27,7 @@ export function NetworkProvider({ children }: { children: ReactNode }) {
           setChain(nets[0].chain);
         }
       })
-      .catch(() => {})
+      .catch((err) => console.error("[NetworkContext] Failed to fetch networks:", err))
       .finally(() => setLoading(false));
   }, []);
 
@@ -47,5 +41,9 @@ export function NetworkProvider({ children }: { children: ReactNode }) {
 }
 
 export function useNetwork() {
-  return useContext(NetworkContext);
+  const ctx = useContext(NetworkContext);
+  if (ctx === null) {
+    throw new Error("useNetwork must be used within a NetworkProvider");
+  }
+  return ctx;
 }

@@ -45,3 +45,31 @@ export interface NetworkInfo {
   chain: string;
   chain_display: string;
 }
+
+export interface MempoolDiagramPoint {
+  weight: number;
+  fee: number;
+}
+
+export interface MempoolDiagramResponse {
+  raw: MempoolDiagramPoint[];
+  windows: Record<string, Record<string, number>>;
+  total_weight: number;
+  total_fee: number;
+}
+
+export interface PerformanceDataBlock {
+  height: number;
+  low: number;
+  high: number;
+}
+
+export interface PerformanceDataEstimate {
+  height: number;
+  rate: number;
+}
+
+export interface PerformanceData {
+  blocks: PerformanceDataBlock[];
+  estimates: PerformanceDataEstimate[];
+}

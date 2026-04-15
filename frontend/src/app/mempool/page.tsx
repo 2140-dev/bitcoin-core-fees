@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { api, MempoolDiagramResponse } from "../../services/api";
+import { api } from "../../services/api";
+import { MempoolDiagramResponse } from "../../types/api";
 import { Header } from "../../components/common/Header";
 import { useNetwork } from "../../context/NetworkContext";
 import MempoolDiagramChart from "../../components/mempool/MempoolDiagramChart";
