@@ -38,7 +38,6 @@ export interface FeeEstimateResponse {
   blocks: number;
   errors?: string[];
   chain?: string;
-  chain_display?: string;
 }
 
 export interface NetworkInfo {

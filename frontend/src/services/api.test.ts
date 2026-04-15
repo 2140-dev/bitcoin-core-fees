@@ -20,8 +20,8 @@ describe('BitcoinCoreAPI', () => {
       json: async () => ({ feerate: 0.0001, blocks: 2 }),
     });
 
-    const result = await api.getFeeEstimate(2, 'economical', 2);
-    expect(fetchMock).toHaveBeenCalledWith('http://test-api:5001/fees/2/economical/2', undefined);
+    const result = await api.getFeeEstimate(2, 'economical', 2, 'main');
+    expect(fetchMock).toHaveBeenCalledWith('http://test-api:5001/fees/2/economical/2?chain=main', undefined);
     expect(result.feerate).toBe(0.0001);
   });
 

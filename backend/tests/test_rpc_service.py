@@ -225,7 +225,7 @@ class TestChainDetection(unittest.TestCase):
         with patch.object(client, 'rpc_call', side_effect=mock_rpc):
             result = client.estimate_smart_fee(2)
         self.assertEqual(result['chain'], 'testnet4')
-        self.assertEqual(result['chain_display'], 'TESTNET4')
+        self.assertNotIn('chain_display', result)
 
 
 class TestRpcRegistry(unittest.TestCase):
