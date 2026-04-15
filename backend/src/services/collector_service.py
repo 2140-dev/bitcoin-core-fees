@@ -34,7 +34,9 @@ def _run_collector_for_chain(chain: str):
             logger.error(f"[Collector:{display}] Loop error: {e}")
 
         elapsed = time.time() - start_time
-        sleep_time = max(0, 7 - elapsed)
+        # Always sleep at least 1 s so a slow or erroring node cannot cause
+        # the loop to spin without any backoff.
+        sleep_time = max(1, 7 - elapsed)
         time.sleep(sleep_time)
 
 
