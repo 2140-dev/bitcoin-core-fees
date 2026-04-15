@@ -109,7 +109,7 @@ class RpcClient:
                     "block_height": h,
                     "block_weight": weight,
                     "mempool_txs_weight": total_mempool_weight,
-                    "ratio": total_mempool_weight / 4_000_000,
+                    "ratio": min(1.0, total_mempool_weight / 4_000_000),
                 })
             except Exception:
                 continue
