@@ -17,10 +17,21 @@ export default function FeeHistoryChart({ blocks, estimates, loading, scaleType 
   useEffect(() => {
     if (!svgRef.current || !containerRef.current || loading || blocks.length === 0) return;
 
+    // Read theme tokens so the chart adapts to light/dark mode.
+    const style = getComputedStyle(document.documentElement);
+    const C = {
+      chartBg:   style.getPropertyValue("--chart-bg").trim()   || "#f1f5f9",
+      grid:      style.getPropertyValue("--chart-grid").trim() || "#ffffff",
+      text:      style.getPropertyValue("--chart-text").trim() || "#6b7280",
+      axis:      style.getPropertyValue("--chart-axis").trim() || "#94a3b8",
+      dataBlue:  style.getPropertyValue("--data-blue").trim()  || "#3b82f6",
+      muted:     style.getPropertyValue("--muted").trim()      || "#6b7280",
+    };
+
     // Clear previous
     d3.select(svgRef.current).selectAll("*").remove();
 
-    const margin = { top: 50, right: 30, bottom: 50, left: 60 };
+    const margin = { top: 50, right: 30, bottom: 70, left: 80 };
     const width = containerRef.current.clientWidth - margin.left - margin.right;
     const height = 500 - margin.top - margin.bottom;
 
@@ -30,11 +41,11 @@ export default function FeeHistoryChart({ blocks, estimates, loading, scaleType 
       .append("g")
       .attr("transform", `translate(${margin.left},${margin.top})`);
 
-    // ggplot background
+    // Plot area background
     svg.append("rect")
       .attr("width", width)
       .attr("height", height)
-      .attr("fill", "#ebebeb")
+      .attr("fill", C.chartBg)
       .attr("rx", 8);
 
     const xDomain = d3.extent(blocks, d => d.height) as [number, number];
@@ -60,11 +71,11 @@ export default function FeeHistoryChart({ blocks, estimates, loading, scaleType 
     const numTicks = Math.min(blocks.length, 10);
     svg.append("g").attr("transform", `translate(0,${height})`)
       .call(d3.axisBottom(x).ticks(numTicks).tickSize(-height).tickFormat(() => ""))
-      .selectAll("line").attr("stroke", "#fff").attr("stroke-width", 1.5);
-    
+      .selectAll("line").attr("stroke", C.grid).attr("stroke-width", 1.5);
+
     svg.append("g")
       .call(d3.axisLeft(y).ticks(10).tickSize(-width).tickFormat(() => ""))
-      .selectAll("line").attr("stroke", "#fff").attr("stroke-width", 1.5);
+      .selectAll("line").attr("stroke", C.grid).attr("stroke-width", 1.5);
 
     // 3. Area (p10 - p90)
     const area = d3.area<any>()
@@ -75,8 +86,8 @@ export default function FeeHistoryChart({ blocks, estimates, loading, scaleType 
 
     svg.append("path")
       .datum(blocks)
-      .attr("fill", "#999")
-      .attr("fill-opacity", 0.3)
+      .attr("fill", C.muted)
+      .attr("fill-opacity", 0.45)
       .attr("d", area);
 
     // 4. Fee Estimate Line (Clipped to blocks)
@@ -89,8 +100,8 @@ export default function FeeHistoryChart({ blocks, estimates, loading, scaleType 
       svg.append("path")
         .datum(visibleEstimates.sort((a, b) => a.height - b.height))
         .attr("fill", "none")
-        .attr("stroke", "#3b82f6")
-        .attr("stroke-width", 3)
+        .attr("stroke", C.dataBlue)
+        .attr("stroke-width", 2.5)
         .attr("stroke-linejoin", "round")
         .attr("stroke-linecap", "round")
         .attr("d", line);
@@ -99,9 +110,9 @@ export default function FeeHistoryChart({ blocks, estimates, loading, scaleType 
     // Axes
     svg.append("g").attr("transform", `translate(0,${height})`)
       .call(d3.axisBottom(x).ticks(numTicks).tickFormat(d3.format("d")))
-      .selectAll("text").attr("fill", "#666").style("font-size", "11px").style("font-weight", "bold");
+      .selectAll("text").attr("fill", C.text).style("font-size", "11px").style("font-weight", "500");
 
-    // Y Axis Ticks (filtering out negative labels if we don't want them visible)
+    // Y Axis Ticks
     const yTicks =
       scaleType === "log"
         ? [0, 1, 2, 5, 10, 20, 50, 100, 250, 500, 1000].filter(v => v <= yMax)
@@ -116,9 +127,31 @@ export default function FeeHistoryChart({ blocks, estimates, loading, scaleType 
     svg.append("g")
       .call(yAxis)
       .selectAll("text")
-      .attr("fill", "#666")
+      .attr("fill", C.text)
       .style("font-size", "11px")
-      .style("font-weight", "bold");
+      .style("font-weight", "500");
+
+    // Axis labels
+    svg.append("text")
+      .attr("x", width / 2)
+      .attr("y", height + 55)
+      .attr("text-anchor", "middle")
+      .style("font-size", "10px")
+      .style("font-weight", "600")
+      .style("letter-spacing", "0.1em")
+      .attr("fill", C.axis)
+      .text("BLOCK HEIGHT");
+
+    svg.append("text")
+      .attr("transform", "rotate(-90)")
+      .attr("x", -height / 2)
+      .attr("y", -65)
+      .attr("text-anchor", "middle")
+      .style("font-size", "10px")
+      .style("font-weight", "600")
+      .style("letter-spacing", "0.1em")
+      .attr("fill", C.axis)
+      .text("FEE RATE (sat/vB)");
 
     // Interaction Tooltip
     const tooltip = d3.select(containerRef.current)
