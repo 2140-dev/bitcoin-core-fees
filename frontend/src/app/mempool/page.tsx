@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { api } from "../../services/api";
 import { MempoolDiagramResponse } from "../../types/api";
 import { Header } from "../../components/common/Header";
@@ -15,23 +15,37 @@ export default function MempoolPage() {
   const [error, setError] = useState<string | null>(null);
   const [blocksToShow, setBlocksToShow] = useState<number | "all">(1);
 
+  const abortRef = useRef<AbortController | null>(null);
+
   const fetchData = useCallback(async () => {
+    abortRef.current?.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
     try {
       setLoading(true);
       setError(null);
       const result = await api.getMempoolDiagram(chain);
-      setData(result);
+      if (!controller.signal.aborted) {
+        setData(result);
+      }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to fetch mempool diagram");
+      if (!controller.signal.aborted) {
+        setError(err instanceof Error ? err.message : "Failed to fetch mempool diagram");
+      }
     } finally {
-      setLoading(false);
+      if (!controller.signal.aborted) {
+        setLoading(false);
+      }
     }
   }, [chain]);
 
   useEffect(() => {
     fetchData();
     const interval = setInterval(fetchData, 30000);
-    return () => clearInterval(interval);
+    return () => {
+      abortRef.current?.abort();
+      clearInterval(interval);
+    };
   }, [fetchData]);
 
   const rawData = data?.raw || [];
