@@ -40,7 +40,7 @@ def create_app():
     def _resolve_chain():
         chain = request.args.get("chain")
         if chain and chain not in rpc_service.registry:
-            return None, (jsonify({"error": f"Unknown chain '{chain}'. Available: {rpc_service.registry.chains()}"}), 400)
+            return None, (jsonify({"error": f"Unknown chain '{chain}'. See /networks for available chains."}), 400)
         return chain, None
 
     # ---------------------------------------------------------------------------
@@ -98,11 +98,12 @@ def create_app():
     @limiter.limit("50 per minute")
     def get_performance_data(start_block):
         target = request.args.get('target', default=2, type=int)
+        count = request.args.get('count', default=100, type=int)
         chain, err = _resolve_chain()
         if err:
             return err
         try:
-            data = rpc_service.get_performance_data(start_height=start_block, count=100, target=target, chain=chain)
+            data = rpc_service.get_performance_data(start_height=start_block, count=count, target=target, chain=chain)
             return jsonify(data)
         except Exception as e:
             logger.error(f"/performance-data RPC failed: {e}", exc_info=True)
@@ -116,7 +117,7 @@ def create_app():
         if err:
             return err
         try:
-            data = rpc_service.calculate_local_summary(target=target, chain=chain)
+            data = rpc_service.calculate_local_summary(target=target, start_height=start_block, chain=chain)
             return jsonify(data)
         except Exception as e:
             logger.error(f"/fees-sum failed: {e}", exc_info=True)

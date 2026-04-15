@@ -186,7 +186,7 @@ class TestApp(unittest.TestCase):
     def test_fees_sum_passes_target_query_param(self):
         with patch('services.rpc_service.calculate_local_summary', return_value={"total": 0}) as mock:
             self.client.get('/fees-sum/800000/?target=144')
-            mock.assert_called_once_with(target=144, chain=None)
+            mock.assert_called_once_with(target=144, start_height=800000, chain=None)
 
     def test_fees_sum_passes_chain_param(self):
         mock_reg = MagicMock()
@@ -194,7 +194,7 @@ class TestApp(unittest.TestCase):
         with patch('services.rpc_service._get_registry', return_value=mock_reg), \
              patch('services.rpc_service.calculate_local_summary', return_value={"total": 0}) as mock:
             self.client.get('/fees-sum/800000/?target=2&chain=testnet4')
-            mock.assert_called_once_with(target=2, chain='testnet4')
+            mock.assert_called_once_with(target=2, start_height=800000, chain='testnet4')
 
     @patch('services.rpc_service.calculate_local_summary', side_effect=RuntimeError("summary fail"))
     def test_fees_sum_error_does_not_leak(self, _):

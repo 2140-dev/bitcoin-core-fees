@@ -194,13 +194,14 @@ class RpcClient:
 
         return {"blocks": blocks, "estimates": estimates}
 
-    def calculate_local_summary(self, target: int = 2) -> Dict[str, Any]:
+    def calculate_local_summary(self, target: int = 2, start_height: Optional[int] = None) -> Dict[str, Any]:
         import services.database_service as db_service
 
         effective_target = _clamp_target(target)
         current_h = self.get_block_count()
+        start_h = start_height if start_height is not None else current_h - 1000
         db_rows = db_service.get_estimates_in_range(
-            current_h - 1000, current_h, effective_target, chain=self.chain,
+            start_h, current_h, effective_target, chain=self.chain,
         )
 
         total = over = under = within = 0
@@ -411,5 +412,5 @@ def get_performance_data(start_height: int, count: int = 100, target: int = 2, c
     return get_client(chain).get_performance_data(start_height, count, target)
 
 
-def calculate_local_summary(target: int = 2, chain: Optional[str] = None) -> Dict[str, Any]:
-    return get_client(chain).calculate_local_summary(target)
+def calculate_local_summary(target: int = 2, start_height: Optional[int] = None, chain: Optional[str] = None) -> Dict[str, Any]:
+    return get_client(chain).calculate_local_summary(target, start_height)
