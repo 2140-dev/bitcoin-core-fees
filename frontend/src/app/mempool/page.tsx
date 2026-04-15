@@ -6,7 +6,7 @@ import { MempoolDiagramResponse } from "../../types/api";
 import { Header } from "../../components/common/Header";
 import { useNetwork } from "../../context/NetworkContext";
 import MempoolDiagramChart from "../../components/mempool/MempoolDiagramChart";
-import { Activity, Database, AlertCircle, RefreshCw, Layers, TrendingUp, Scale, Database as DbIcon } from "lucide-react";
+import { AlertCircle, RefreshCw, Database as DbIcon } from "lucide-react";
 
 export default function MempoolPage() {
   const { chain } = useNetwork();
@@ -64,16 +64,16 @@ export default function MempoolPage() {
         <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-8 gap-6">
           <div className="flex flex-wrap items-center gap-6 text-left">
             <div className="flex flex-col">
-              <span className="text-[8px] uppercase font-black text-[var(--muted)] tracking-widest">Total Size</span>
-              <span className="text-sm font-mono font-bold">{(totalWeight / 1000000).toFixed(2)} MWU</span>
+              <span className="text-[9px] uppercase font-semibold text-[var(--muted)] tracking-wider">Total Size</span>
+              <span className="text-sm font-mono tabular-nums font-semibold">{(totalWeight / 1000000).toFixed(2)} MWU</span>
             </div>
             <div className="flex flex-col">
-              <span className="text-[8px] uppercase font-black text-[var(--muted)] tracking-widest">Total Fees</span>
-              <span className="text-sm font-mono font-bold">{totalFee.toFixed(4)} BTC</span>
+              <span className="text-[9px] uppercase font-semibold text-[var(--muted)] tracking-wider">Total Fees</span>
+              <span className="text-sm font-mono tabular-nums font-semibold">{totalFee.toFixed(4)} BTC</span>
             </div>
             <div className="flex flex-col">
-              <span className="text-[8px] uppercase font-black text-[var(--muted)] tracking-widest">Mempool Chunks</span>
-              <span className="text-sm font-mono font-bold">{rawData.length || "---"}</span>
+              <span className="text-[9px] uppercase font-semibold text-[var(--muted)] tracking-wider">Fee-Rate Groups</span>
+              <span className="text-sm font-mono tabular-nums font-semibold">{rawData.length || "---"}</span>
             </div>
           </div>
           
@@ -114,12 +114,12 @@ export default function MempoolPage() {
         <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-10">
           {["5", "25", "50", "75", "95"].map((p) => (
             <div key={p} className="bg-[var(--card)] p-6 rounded-3xl border border-[var(--card-border)] shadow-sm text-left group hover:border-orange-500/30 transition-all">
-              <h3 className="text-[var(--muted)] text-[9px] font-bold uppercase tracking-[0.2em] mb-2">{p}th Percentile</h3>
+              <h3 className="text-[var(--muted)] text-[9px] font-semibold uppercase tracking-wider mb-1">p{p} feerate</h3>
               <div className="flex items-baseline gap-1">
-                <p className="text-2xl font-black font-mono tracking-tighter">
+                <p className="text-2xl font-black font-mono tabular-nums tracking-tight">
                   {currentPercentiles[p] ? currentPercentiles[p].toFixed(1) : "---"}
                 </p>
-                <span className="text-[10px] font-bold text-[var(--muted)]">sat/vB</span>
+                <span className="text-[10px] font-medium text-[var(--muted)]">sat/vB</span>
               </div>
             </div>
           ))}
@@ -136,9 +136,9 @@ export default function MempoolPage() {
                 {blocksToShow === "all" ? "Full mempool accumulation" : `Accumulation across first ${blocksToShow} block window`}
               </p>
             </div>
-            <div className="flex gap-4 text-[9px] font-black uppercase tracking-widest text-[var(--muted)] bg-[var(--background)] px-4 py-2 rounded-lg border border-[var(--card-border)]">
-              <div className="flex items-center gap-1.5"><div className="w-2.5 h-2.5 bg-orange-500 rounded-sm"></div> Cumulative Fee</div>
-              <div className="flex items-center gap-1.5"><div className="w-2.5 h-0.5 border-t border-dashed border-[#666]"></div> Block Boundary</div>
+            <div className="flex gap-4 text-[9px] font-medium uppercase tracking-wider text-[var(--muted)] bg-[var(--surface-2)] px-4 py-2 rounded-lg border border-[var(--card-border)]">
+              <div className="flex items-center gap-1.5"><div className="w-2.5 h-2.5 bg-[var(--accent)] rounded-sm"></div> Cumulative fee</div>
+              <div className="flex items-center gap-1.5"><div className="w-2.5 h-0.5 border-t border-dashed border-[var(--muted)]"></div> Block boundary</div>
             </div>
           </div>
           
