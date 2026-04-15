@@ -71,7 +71,7 @@ export function NetworkBadge({ className = "" }: NetworkBadgeProps) {
         aria-haspopup={hasMultiple ? "listbox" : undefined}
         aria-expanded={hasMultiple ? open : undefined}
         aria-disabled={!hasMultiple}
-        className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg ${style.bg} border ${style.border} ${style.text} text-xs font-bold transition-all ${hasMultiple ? "cursor-pointer hover:opacity-80" : "cursor-default"}`}
+        className={`inline-flex items-center gap-2 px-2 md:px-3 py-1.5 rounded-lg ${style.bg} border ${style.border} ${style.text} text-xs font-bold transition-all ${hasMultiple ? "cursor-pointer hover:opacity-80" : "cursor-default"}`}
       >
         <div className={`w-2 h-2 rounded-full ${style.dot} animate-pulse`} />
         {label}
@@ -81,8 +81,17 @@ export function NetworkBadge({ className = "" }: NetworkBadgeProps) {
       </button>
 
       {open && hasMultiple && (
-        <div role="listbox" className="absolute right-0 top-full mt-2 min-w-[160px] bg-[var(--card)] border border-[var(--card-border)] rounded-xl shadow-xl overflow-hidden z-50">
-          {networks.map((n) => {
+        <>
+          {/* Mobile backdrop for easier closing and focus */}
+          <div
+            className="fixed inset-0 z-40 md:hidden"
+            onClick={() => setOpen(false)}
+          />
+          <div
+            role="listbox"
+            className="fixed inset-x-4 top-20 md:absolute md:inset-auto md:right-0 md:top-full mt-2 md:w-48 bg-[var(--card)] border border-[var(--card-border)] rounded-xl shadow-xl overflow-hidden z-50"
+          >
+            {networks.map((n) => {
             const s = getStyle(n.chain);
             const isActive = n.chain === chain;
             const name = toTitleCase(n.chain_display);
@@ -105,6 +114,7 @@ export function NetworkBadge({ className = "" }: NetworkBadgeProps) {
             );
           })}
         </div>
+        </>
       )}
     </div>
   );
