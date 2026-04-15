@@ -16,12 +16,24 @@ def _make_mock_registry():
 
 
 def make_app():
-    """Create a Flask test app with all side effects patched out."""
+    """Create a Flask test app with all side effects patched out.
+
+    The _get_registry patch is kept active after this function returns by
+    directly setting the module-level _registry singleton to the mock.
+    Routes that call rpc_service.registry during request handling (e.g.
+    _resolve_chain) will see the mock registry rather than attempting to
+    build a real one from rpc_config.ini.
+    """
+    import services.rpc_service as rpc_service_module
+
     mock_reg = _make_mock_registry()
 
-    with patch('services.rpc_service._registry', mock_reg), \
-         patch('services.rpc_service._get_registry', return_value=mock_reg), \
-         patch('services.database_service.init_db', return_value=None), \
+    # Assign directly to the module-level singleton so _get_registry() finds
+    # a non-None value and returns mock_reg on every call, including calls
+    # that happen after this function returns (i.e. during actual test requests).
+    rpc_service_module._registry = mock_reg
+
+    with patch('services.database_service.init_db', return_value=None), \
          patch('services.collector_service.start_background_collectors', return_value=None):
         from app import create_app
         app = create_app()
