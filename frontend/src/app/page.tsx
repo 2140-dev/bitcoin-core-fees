@@ -6,6 +6,7 @@ import { AlertCircle, BarChart2, Activity, Loader2, ChevronLeft, ChevronRight } 
 import { FeeEstimateResponse, MempoolHealthStats } from "../types/api";
 import { Header } from "../components/common/Header";
 import { useNetwork } from "../context/NetworkContext";
+import { prefetchStats } from "../lib/statsCache";
 
 type FeeMode = "economical" | "conservative";
 
@@ -63,8 +64,17 @@ export default function LandingPage() {
 
   useEffect(() => {
     fetchAll(mode, true);
-    return () => { abortRef.current?.abort(); };
+    const interval = setInterval(() => fetchAll(mode, true), 30_000);
+    return () => {
+      clearInterval(interval);
+      abortRef.current?.abort();
+    };
   }, [fetchAll, mode]);
+
+  // Fire-and-forget prefetch for stats page when chain resolves.
+  useEffect(() => {
+    if (chain) prefetchStats(chain);
+  }, [chain]);
 
   const toggleMode = () => {
     setMode(prev => prev === "economical" ? "conservative" : "economical");
@@ -194,12 +204,12 @@ function FeeCard({ label, target, data, loading, updating }: {
         ) : (
           <div className={`transition-all duration-300 ${updating ? "opacity-40 scale-95 blur-[1px]" : ""}`}>
             <div className="flex items-baseline justify-center gap-2">
-              <span className="text-6xl font-black tracking-tighter tabular-nums">
+              <span className="text-6xl font-black tracking-tighter tabular-nums font-mono">
                 {data?.feerate_sat_per_vb ? data.feerate_sat_per_vb.toFixed(1) : "---"}
               </span>
-              <span className="text-lg font-bold text-[var(--muted)]">sat/vB</span>
+              <span className="text-base font-medium text-[var(--muted)]">sat/vB</span>
             </div>
-            <p className="text-[10px] text-[var(--muted)] font-mono uppercase tracking-[0.2em] mt-2">
+            <p className="text-[10px] text-[var(--text-secondary)] font-mono mt-2 tracking-wide">
               {target === 2 ? "1–2 blocks" : `within ${target} blocks`}
             </p>
           </div>
