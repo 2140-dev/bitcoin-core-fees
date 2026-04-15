@@ -1,9 +1,9 @@
 import { useState, useEffect, useCallback } from "react";
 import { api } from "../services/api";
-import { AnalyticsSummary, MempoolHealthStats } from "../types/api";
+import { AnalyticsSummary, MempoolHealthStats, PerformanceData } from "../types/api";
 
 export function useStats(target: number = 2, chain?: string) {
-  const [performanceData, setPerformanceData] = useState<{ blocks: any[]; estimates: any[] }>({ blocks: [], estimates: [] });
+  const [performanceData, setPerformanceData] = useState<PerformanceData>({ blocks: [], estimates: [] });
   const [summary, setSummary] = useState<AnalyticsSummary | null>(null);
   const [healthStats, setHealthStats] = useState<MempoolHealthStats[]>([]);
   const [loading, setLoading] = useState(true);
@@ -20,15 +20,15 @@ export function useStats(target: number = 2, chain?: string) {
       
       const count = Math.max(1, end - start);
       
-      const [pData, fSum, feeEst] = await Promise.all([
+      const [pData, fSum, health] = await Promise.all([
         api.getPerformanceData(start, count, confTarget, chain),
         api.getFeesSum(start, confTarget, chain),
-        api.getFeeEstimate(confTarget, "unset", 2, chain)
+        api.getMempoolHealth(chain),
       ]);
 
       setPerformanceData(pData);
       setSummary(fSum);
-      setHealthStats(feeEst.mempool_health_statistics || []);
+      setHealthStats(health);
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Failed to fetch performance data";
       setError(msg);

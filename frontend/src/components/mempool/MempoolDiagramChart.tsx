@@ -2,7 +2,7 @@
 
 import React, { useEffect, useRef } from "react";
 import * as d3 from "d3";
-import { MempoolDiagramPoint } from "../../services/api";
+import { MempoolDiagramPoint } from "../../types/api";
 
 interface Props {
   data: MempoolDiagramPoint[];
