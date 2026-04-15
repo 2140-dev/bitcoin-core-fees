@@ -7,6 +7,7 @@ const BACKEND_URL = process.env.BACKEND_URL ?? "http://127.0.0.1:5001";
 const ALLOWED_PATH_ROOTS = new Set([
   "blockcount",
   "mempool-diagram",
+  "mempool-health",
   "fees",
   "performance-data",
   "fees-sum",

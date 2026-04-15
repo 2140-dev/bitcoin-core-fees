@@ -71,16 +71,13 @@ class RpcClient:
         except Exception as e:
             raise RuntimeError(f"RPC call '{method}' failed: {type(e).__name__}") from e
 
-    # Keep _rpc_call as alias so tests can patch it
-    _rpc_call = rpc_call
-
     def get_block_count(self) -> int:
         return self.rpc_call("getblockcount", [])
 
     def get_blockchain_info(self) -> Dict[str, Any]:
         result = self.rpc_call("getblockchaininfo", [])
         if not result:
-            return {"chain": "main", "blockcount": self.get_block_count()}
+            raise RuntimeError("getblockchaininfo returned empty result — cannot determine chain")
         chain = result.get("chain", "main")
         blocks = result.get("blocks", self.get_block_count())
         display = CHAIN_DISPLAY_NAMES.get(chain, chain.upper())
@@ -88,18 +85,13 @@ class RpcClient:
 
     def estimate_smart_fee(self, conf_target: int, mode: str = "unset", verbosity_level: int = 2) -> Dict[str, Any]:
         effective_target = _clamp_target(conf_target)
-        result = self.rpc_call("estimatesmartfee", [effective_target, mode])
+        result = self.rpc_call("estimatesmartfee", [effective_target, mode, verbosity_level])
         if result and "feerate" in result:
             result["feerate_sat_per_vb"] = result["feerate"] * 100_000
 
         if result is not None:
             result["chain"] = self.chain
             result["chain_display"] = self.chain_display
-
-        try:
-            result["mempool_health_statistics"] = self.get_mempool_health_statistics()
-        except Exception as e:
-            logger.error(f"Failed to include health stats: {e}")
 
         return result
 
@@ -409,6 +401,10 @@ def estimate_smart_fee(conf_target: int, mode: str = "unset", verbosity_level: i
 
 def get_mempool_feerate_diagram_analysis(chain: Optional[str] = None) -> Dict[str, Any]:
     return get_client(chain).get_mempool_feerate_diagram_analysis()
+
+
+def get_mempool_health_statistics(chain: Optional[str] = None) -> List[Dict[str, Any]]:
+    return get_client(chain).get_mempool_health_statistics()
 
 
 def get_performance_data(start_height: int, count: int = 100, target: int = 2, chain: Optional[str] = None) -> Dict[str, Any]:

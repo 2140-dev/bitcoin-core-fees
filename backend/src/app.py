@@ -68,6 +68,19 @@ def create_app():
             logger.error(f"/fees RPC failed: {e}", exc_info=True)
             return jsonify({"error": "Internal server error"}), 500
 
+    @app.route("/mempool-health", methods=['GET'])
+    @limiter.limit("50 per minute")
+    def mempool_health():
+        chain, err = _resolve_chain()
+        if err:
+            return err
+        try:
+            result = rpc_service.get_mempool_health_statistics(chain=chain)
+            return jsonify(result)
+        except Exception as e:
+            logger.error(f"/mempool-health RPC failed: {e}", exc_info=True)
+            return jsonify({"error": "Internal server error"}), 500
+
     @app.route("/mempool-diagram", methods=['GET'])
     @limiter.limit("50 per minute")
     def mempool_diagram():
