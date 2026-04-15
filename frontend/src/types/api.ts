@@ -22,11 +22,15 @@ export interface MempoolHealthStats {
 }
 
 export interface FeeEstimateResponse {
+  /** Raw feerate in BTC/kvB as returned by Bitcoin Core. */
   feerate: number;
+  /** Feerate converted to sat/vB (feerate × 100,000). */
   feerate_sat_per_vb: number;
+  /** Actual confirmation target used by the node (may differ from requested). */
   blocks: number;
   errors?: string[];
-  chain?: string;
+  /** Chain name ("main" | "test" | "testnet4" | "signet" | "regtest"). */
+  chain: string;
 }
 
 export interface NetworkInfo {

@@ -1,11 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import { BarChart3, TrendingUp, AlertCircle, CheckCircle2, Search, Activity, Database, ArrowRight, RefreshCw, Scale } from "lucide-react";
+import { BarChart3, TrendingUp, AlertCircle, CheckCircle2, Database, ArrowRight, RefreshCw } from "lucide-react";
 import { useStats } from "../../hooks/useStats";
 import { Header } from "../../components/common/Header";
 import { useNetwork } from "../../context/NetworkContext";
 import FeeHistoryChart from "../../components/stats/FeeHistoryChart";
+import SummaryCard from "../../components/stats/SummaryCard";
 
 export default function StatsPage() {
   const { chain } = useNetwork();
@@ -193,26 +194,6 @@ export default function StatsPage() {
           </div>
         </div>
       </main>
-    </div>
-  );
-}
-
-function SummaryCard({ title, value, percent, icon, colorClass, bgColorClass, total }: any) {
-  return (
-    <div className="bg-[var(--card)] p-8 rounded-3xl border border-[var(--card-border)] shadow-sm group hover:shadow-md transition-all text-left">
-      <div className="flex justify-between items-start mb-6">
-        <div className={`p-3.5 ${bgColorClass} rounded-2xl shadow-inner`}>{icon}</div>
-        <div className="text-right">
-          <span className={`text-3xl font-black tabular-nums font-mono tracking-tight ${colorClass}`}>
-            {percent !== undefined ? (percent * 100).toFixed(1) : "0"}%
-          </span>
-        </div>
-      </div>
-      <h3 className="text-[var(--muted)] text-[11px] font-semibold uppercase tracking-widest">{title}</h3>
-      <p className="text-xl font-semibold mt-1 font-mono tabular-nums">
-        {value || 0} <span className="text-[var(--muted)] font-normal">/ {total || 0}</span>
-        <span className="text-xs font-normal text-[var(--muted)] ml-1">estimates</span>
-      </p>
     </div>
   );
 }
