@@ -79,6 +79,7 @@ frontend/.next/
 frontend/node_modules/
 frontend/frontend.log
 frontend/frontend.pd
+!frontend/src/lib/
 
 # Scrapy stuff:
 .scrapy
