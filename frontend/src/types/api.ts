@@ -34,11 +34,11 @@ export interface MempoolHealthStats {
 
 export interface FeeEstimateResponse {
   feerate: number;
+  feerate_sat_per_vb: number;
   blocks: number;
   errors?: string[];
   chain?: string;
   chain_display?: string;
-  mempool_health_statistics?: MempoolHealthStats[];
 }
 
 export interface NetworkInfo {

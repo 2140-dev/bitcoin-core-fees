@@ -4,6 +4,7 @@ import {
   FeesStatsMap,
   BlockchainInfo,
   FeeEstimateResponse,
+  MempoolHealthStats,
   NetworkInfo,
 } from "../types/api";
 
@@ -45,12 +46,6 @@ export class BitcoinCoreAPI {
     }
   }
 
-  private chainParam(chain?: string, existingParams?: string): string {
-    if (!chain) return existingParams ? `?${existingParams}` : "";
-    const sep = existingParams ? "&" : "";
-    return `?${existingParams || ""}${sep}chain=${chain}`;
-  }
-
   async getNetworks(): Promise<NetworkInfo[]> {
     return this.fetchJson<NetworkInfo[]>("networks");
   }
@@ -78,6 +73,11 @@ export class BitcoinCoreAPI {
   async getMempoolDiagram(chain?: string): Promise<MempoolDiagramResponse> {
     const q = chain ? `?chain=${chain}` : "";
     return this.fetchJson<MempoolDiagramResponse>(`mempool-diagram${q}`);
+  }
+
+  async getMempoolHealth(chain?: string): Promise<MempoolHealthStats[]> {
+    const q = chain ? `?chain=${chain}` : "";
+    return this.fetchJson<MempoolHealthStats[]>(`mempool-health${q}`);
   }
 }
 

@@ -71,12 +71,6 @@ class TestRpcClient(unittest.TestCase):
                 return {"feerate": 0.0001, "blocks": 2}
             if method == "getblockchaininfo":
                 return {"chain": "main", "blocks": 800000}
-            if method == "getblockcount":
-                return 800000
-            if method == "getmempoolfeeratediagram":
-                return [{"fee": 0.001, "weight": 100000}]
-            if method == "getblockstats":
-                return {"height": params[0], "total_weight": 1000000}
             return None
 
         with patch.object(self.client, 'rpc_call', side_effect=mock_rpc):
@@ -89,12 +83,6 @@ class TestRpcClient(unittest.TestCase):
                 return {"feerate": 1.0, "blocks": 2}
             if method == "getblockchaininfo":
                 return {"chain": "main", "blocks": 800000}
-            if method == "getblockcount":
-                return 800000
-            if method == "getmempoolfeeratediagram":
-                return [{"fee": 0.001, "weight": 100000}]
-            if method == "getblockstats":
-                return {"height": params[0], "total_weight": 1000000}
             return None
 
         with patch.object(self.client, 'rpc_call', side_effect=mock_rpc):
@@ -107,10 +95,6 @@ class TestRpcClient(unittest.TestCase):
                 return {"blocks": 2}
             if method == "getblockchaininfo":
                 return {"chain": "main", "blocks": 800000}
-            if method == "getblockcount":
-                return 800000
-            if method == "getmempoolfeeratediagram":
-                return []
             return None
 
         with patch.object(self.client, 'rpc_call', side_effect=mock_rpc):
@@ -123,12 +107,6 @@ class TestRpcClient(unittest.TestCase):
                 return {"feerate": 0.0001}
             if method == "getblockchaininfo":
                 return {"chain": "main", "blocks": 800000}
-            if method == "getblockcount":
-                return 800000
-            if method == "getmempoolfeeratediagram":
-                return [{"fee": 0.001, "weight": 100000}]
-            if method == "getblockstats":
-                return {"height": params[0], "total_weight": 1000000}
             return None
 
         with patch.object(self.client, 'rpc_call', side_effect=mock_rpc) as mock:
@@ -137,6 +115,19 @@ class TestRpcClient(unittest.TestCase):
             self.assertGreater(len(esf_calls), 0)
             params = esf_calls[0][0][1]
             self.assertEqual(params[0], 2)
+
+    def test_verbosity_level_forwarded_to_rpc(self):
+        def mock_rpc(method, params):
+            if method == "estimatesmartfee":
+                return {"feerate": 0.0001, "blocks": 2}
+            if method == "getblockchaininfo":
+                return {"chain": "main", "blocks": 800000}
+            return None
+
+        with patch.object(self.client, 'rpc_call', side_effect=mock_rpc) as mock:
+            self.client.estimate_smart_fee(2, "unset", 3)
+            esf_calls = [c for c in mock.call_args_list if c[0][0] == "estimatesmartfee"]
+            self.assertEqual(esf_calls[0][0][1], [2, "unset", 3])
 
     # --- get_single_block_stats cache safety --------------------------------
 
@@ -229,10 +220,6 @@ class TestChainDetection(unittest.TestCase):
                 return {"feerate": 0.0001, "blocks": 2}
             if method == "getblockchaininfo":
                 return {"chain": "testnet4", "blocks": 100}
-            if method == "getblockcount":
-                return 100
-            if method == "getmempoolfeeratediagram":
-                return []
             return None
 
         with patch.object(client, 'rpc_call', side_effect=mock_rpc):
