@@ -1,12 +1,11 @@
 import { useState, useEffect, useCallback } from "react";
 import { api } from "../services/api";
-import { AnalyticsSummary, MempoolHealthStats, PerformanceData } from "../types/api";
+import { AnalyticsSummary, PerformanceData } from "../types/api";
 import { statsCache } from "../lib/statsCache";
 
 export function useStats(target: number = 2, chain?: string) {
   const [performanceData, setPerformanceData] = useState<PerformanceData>({ blocks: [], estimates: [] });
   const [summary, setSummary] = useState<AnalyticsSummary | null>(null);
-  const [healthStats, setHealthStats] = useState<MempoolHealthStats[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -21,10 +20,9 @@ export function useStats(target: number = 2, chain?: string) {
 
       const count = Math.max(1, end - start);
 
-      const [pData, fSum, health] = await Promise.all([
+      const [pData, fSum] = await Promise.all([
         api.getPerformanceData(start, count, confTarget, chain),
         api.getFeesSum(start, confTarget, chain),
-        api.getMempoolHealth(chain),
       ]);
 
       if (chain) {
@@ -32,7 +30,6 @@ export function useStats(target: number = 2, chain?: string) {
       }
       setPerformanceData(pData);
       setSummary(fSum);
-      setHealthStats(health);
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Failed to fetch performance data";
       setError(msg);
@@ -106,7 +103,6 @@ export function useStats(target: number = 2, chain?: string) {
     blocks: performanceData.blocks,
     estimates: performanceData.estimates,
     summary,
-    healthStats,
     loading,
     error,
     startBlock,

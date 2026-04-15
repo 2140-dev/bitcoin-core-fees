@@ -93,7 +93,7 @@ def get_estimates_in_range(start_height, end_height, target=2, chain="main"):
                 FROM (
                     SELECT poll_height, target, estimate_feerate, expected_height,
                            ROW_NUMBER() OVER (
-                               PARTITION BY poll_height, target ORDER BY timestamp ASC
+                               PARTITION BY poll_height, target ORDER BY timestamp ASC, id ASC
                            ) AS rn
                     FROM fee_estimates
                     WHERE poll_height >= ? AND poll_height <= ? AND target = ?
