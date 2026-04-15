@@ -8,17 +8,6 @@ export interface AnalyticsSummary {
   within_perc: number;
 }
 
-export interface BlockStats {
-  height: number;
-  min: number | null;
-  max: number | null;
-  estimated: number | null;
-  actual: number | null;
-}
-
-export type BlockStatsMap = Record<string, [number, number]>;
-export type FeesStatsMap = Record<string, number[]>;
-
 export interface BlockchainInfo {
   blockcount: number;
   chain?: string;        // "main" | "test" | "signet" | "regtest"
