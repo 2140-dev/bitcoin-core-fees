@@ -38,9 +38,8 @@ export class BitcoinCoreAPI {
     return this.fetchJson<NetworkInfo[]>("networks");
   }
 
-  async getFeeEstimate(target: number = 2, mode: string = "economical", level: number = 2, chain?: string): Promise<FeeEstimateResponse> {
-    const q = chain ? `?chain=${chain}` : "";
-    return this.fetchJson<FeeEstimateResponse>(`fees/${target}/${mode}/${level}${q}`);
+  async getFeeEstimate(target: number = 2, mode: string = "economical", level: number = 2, chain: string): Promise<FeeEstimateResponse> {
+    return this.fetchJson<FeeEstimateResponse>(`fees/${target}/${mode}/${level}?chain=${chain}`);
   }
 
   async getBlockCount(chain?: string): Promise<BlockchainInfo> {

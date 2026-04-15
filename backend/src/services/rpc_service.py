@@ -91,7 +91,6 @@ class RpcClient:
 
         if result is not None:
             result["chain"] = self.chain
-            result["chain_display"] = self.chain_display
 
         return result
 

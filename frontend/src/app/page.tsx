@@ -20,10 +20,11 @@ export default function LandingPage() {
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const fetchFee = useCallback(async (confTarget: number, feeMode: FeeMode, silent = false) => {
+    if (!chain) return;
     try {
       if (!silent) setInitialLoading(true);
       else setIsUpdating(true);
-      
+
       setError(null);
       const data = await api.getFeeEstimate(confTarget, feeMode, 2, chain);
       setFeeData(data);
