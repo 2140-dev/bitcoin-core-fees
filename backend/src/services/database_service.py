@@ -89,10 +89,17 @@ def get_estimates_in_range(start_height, end_height, target=2, chain="main"):
             conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
             cursor.execute('''
-                SELECT DISTINCT poll_height, target, estimate_feerate, expected_height
-                FROM fee_estimates
-                WHERE poll_height >= ? AND poll_height <= ? AND target = ?
-                ORDER BY poll_height ASC, timestamp ASC
+                SELECT poll_height, target, estimate_feerate, expected_height
+                FROM (
+                    SELECT poll_height, target, estimate_feerate, expected_height,
+                           ROW_NUMBER() OVER (
+                               PARTITION BY poll_height, target ORDER BY timestamp ASC
+                           ) AS rn
+                    FROM fee_estimates
+                    WHERE poll_height >= ? AND poll_height <= ? AND target = ?
+                )
+                WHERE rn = 1
+                ORDER BY poll_height ASC
             ''', (start_height, end_height, target))
             rows = cursor.fetchall()
 

@@ -87,6 +87,7 @@ class RpcClient:
         effective_target = _clamp_target(conf_target)
         result = self.rpc_call("estimatesmartfee", [effective_target, mode, verbosity_level])
         if result and "feerate" in result:
+            # feerate is BTC/kvB → sat/vB: ×100_000_000 sat/BTC ÷ 1000 vB/kvB = ×100_000
             result["feerate_sat_per_vb"] = result["feerate"] * 100_000
 
         if result is not None:
@@ -108,7 +109,7 @@ class RpcClient:
                     "block_height": h,
                     "block_weight": weight,
                     "mempool_txs_weight": total_mempool_weight,
-                    "ratio": min(1.0, total_mempool_weight / 4_000_000),
+                    "ratio": total_mempool_weight / 4_000_000,
                 })
             except Exception:
                 continue
