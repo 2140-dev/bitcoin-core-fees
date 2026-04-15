@@ -52,8 +52,3 @@ def start_background_collectors():
         thread.start()
         logger.info(f"Collector thread started for {chain}")
 
-
-def reset_collectors():
-    """Reset the started flag. Only call this in tests."""
-    global _collectors_started
-    _collectors_started = False
