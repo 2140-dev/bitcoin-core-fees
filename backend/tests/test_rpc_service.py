@@ -74,7 +74,7 @@ class TestRpcClient(unittest.TestCase):
             return None
 
         with patch.object(self.client, 'rpc_call', side_effect=mock_rpc):
-            result = self.client.estimate_smart_fee(2, "unset", 2)
+            result = self.client.estimate_smart_fee(2)
         self.assertAlmostEqual(result['feerate_sat_per_vb'], 0.0001 * 100_000)
 
     def test_feerate_conversion_is_correct(self):
@@ -86,7 +86,7 @@ class TestRpcClient(unittest.TestCase):
             return None
 
         with patch.object(self.client, 'rpc_call', side_effect=mock_rpc):
-            result = self.client.estimate_smart_fee(2, "unset", 2)
+            result = self.client.estimate_smart_fee(2)
         self.assertAlmostEqual(result['feerate_sat_per_vb'], 100_000.0)
 
     def test_no_feerate_key_does_not_crash(self):
@@ -98,7 +98,7 @@ class TestRpcClient(unittest.TestCase):
             return None
 
         with patch.object(self.client, 'rpc_call', side_effect=mock_rpc):
-            result = self.client.estimate_smart_fee(2, "unset", 2)
+            result = self.client.estimate_smart_fee(2)
         self.assertNotIn('feerate_sat_per_vb', result)
 
     def test_clamps_target_in_rpc_call(self):
@@ -110,13 +110,13 @@ class TestRpcClient(unittest.TestCase):
             return None
 
         with patch.object(self.client, 'rpc_call', side_effect=mock_rpc) as mock:
-            self.client.estimate_smart_fee(1, "unset", 2)
+            self.client.estimate_smart_fee(1)
             esf_calls = [c for c in mock.call_args_list if c[0][0] == "estimatesmartfee"]
             self.assertGreater(len(esf_calls), 0)
             params = esf_calls[0][0][1]
             self.assertEqual(params[0], 2)
 
-    def test_verbosity_level_forwarded_to_rpc(self):
+    def test_verbosity_forwarded_to_rpc(self):
         def mock_rpc(method, params):
             if method == "estimatesmartfee":
                 return {"feerate": 0.0001, "blocks": 2}
@@ -125,9 +125,49 @@ class TestRpcClient(unittest.TestCase):
             return None
 
         with patch.object(self.client, 'rpc_call', side_effect=mock_rpc) as mock:
-            self.client.estimate_smart_fee(2, "unset", 3)
+            self.client.estimate_smart_fee(2, "unset", 1)
             esf_calls = [c for c in mock.call_args_list if c[0][0] == "estimatesmartfee"]
-            self.assertEqual(esf_calls[0][0][1], [2, "unset", 3])
+            self.assertEqual(esf_calls[0][0][1], [2, "unset", 1, False])
+
+    def test_block_policy_only_forwarded_to_rpc(self):
+        def mock_rpc(method, params):
+            if method == "estimatesmartfee":
+                return {"feerate": 0.0001, "blocks": 2}
+            if method == "getblockchaininfo":
+                return {"chain": "main", "blocks": 800000}
+            return None
+
+        with patch.object(self.client, 'rpc_call', side_effect=mock_rpc) as mock:
+            self.client.estimate_smart_fee(2, "unset", 2, block_policy_only=True)
+            esf_calls = [c for c in mock.call_args_list if c[0][0] == "estimatesmartfee"]
+            self.assertEqual(esf_calls[0][0][1], [2, "unset", 2, True])
+
+    def test_estimator_field_passed_through(self):
+        def mock_rpc(method, params):
+            if method == "estimatesmartfee":
+                return {"feerate": 0.0001, "blocks": 2, "estimator": "mempool"}
+            if method == "getblockchaininfo":
+                return {"chain": "main", "blocks": 800000}
+            return None
+
+        with patch.object(self.client, 'rpc_call', side_effect=mock_rpc):
+            result = self.client.estimate_smart_fee(2, "unset", 2, block_policy_only=False)
+        self.assertEqual(result['estimator'], 'mempool')
+
+    def test_mempool_health_uses_block_policy_only_false(self):
+        captured = {}
+
+        def mock_rpc(method, params):
+            if method == "estimatesmartfee":
+                captured['params'] = params
+                return {"blocks": 2, "mempool_health_statistics": []}
+            if method == "getblockchaininfo":
+                return {"chain": "main", "blocks": 800000}
+            return None
+
+        with patch.object(self.client, 'rpc_call', side_effect=mock_rpc):
+            self.client.get_mempool_health_statistics()
+        self.assertEqual(captured['params'][3], False)
 
     # --- get_single_block_stats cache safety --------------------------------
 
@@ -223,7 +263,7 @@ class TestChainDetection(unittest.TestCase):
             return None
 
         with patch.object(client, 'rpc_call', side_effect=mock_rpc):
-            result = client.estimate_smart_fee(2)
+            result = client.estimate_smart_fee(2, block_policy_only=False)
         self.assertEqual(result['chain'], 'testnet4')
         self.assertNotIn('chain_display', result)
 

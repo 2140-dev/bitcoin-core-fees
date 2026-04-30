@@ -63,8 +63,9 @@ def create_app():
         chain, err = _resolve_chain()
         if err:
             return err
+        block_policy_only = request.args.get("block_policy_only", "false").lower() != "false"
         try:
-            result = rpc_service.estimate_smart_fee(conf_target=target, mode=mode, verbosity_level=level, chain=chain)
+            result = rpc_service.estimate_smart_fee(conf_target=target, mode=mode, verbosity=level, block_policy_only=block_policy_only, chain=chain)
             return jsonify(result)
         except Exception as e:
             logger.error(f"/fees RPC failed: {e}", exc_info=True)

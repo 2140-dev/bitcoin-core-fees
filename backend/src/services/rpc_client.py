@@ -120,14 +120,23 @@ class RpcClient:
         display = CHAIN_DISPLAY_NAMES.get(chain, chain.upper())
         return {"chain": chain, "chain_display": display, "blockcount": blocks}
 
-    def estimate_smart_fee(self, conf_target: int, mode: str = "unset", verbosity_level: int = 2) -> Dict[str, Any]:
+    def estimate_smart_fee(
+        self,
+        conf_target: int,
+        mode: str = "unset",
+        verbosity: int = 2,
+        block_policy_only: bool = False,
+    ) -> Dict[str, Any]:
         """Call estimatesmartfee and annotate the result with sat/vB conversion.
 
         The raw feerate is BTC/kvB.  Conversion:
             BTC/kvB × 100,000,000 sat/BTC ÷ 1,000 vB/kvB = sat/vB × 100,000
+
+        With block_policy_only=False (our default) the node may use additional
+        estimators and returns an ``estimator`` field naming the one chosen.
         """
         effective_target = _clamp_target(conf_target)
-        result = self.rpc_call("estimatesmartfee", [effective_target, mode, verbosity_level])
+        result = self.rpc_call("estimatesmartfee", [effective_target, mode, verbosity, block_policy_only])
         if result and "feerate" in result:
             result["feerate_sat_per_vb"] = result["feerate"] * 100_000
         if result is not None:
@@ -137,12 +146,10 @@ class RpcClient:
     def get_mempool_health_statistics(self) -> List[Dict[str, Any]]:
         """Return per-block mempool health stats via estimatesmartfee verbosity 2.
 
-        verbosity=2 (Bitcoin Core PR #34075) includes mempool_health_statistics
-        directly in the response, avoiding a separate RPC round-trip.
-        mempool_txs_weight is the weight of mempool transactions projected into
-        each block — not the live mempool total.
+        verbosity=2 includes mempool_health_statistics in the response, but only
+        when block_policy_only=False.
         """
-        result = self.rpc_call("estimatesmartfee", [2, "unset", 2])
+        result = self.rpc_call("estimatesmartfee", [2, "unset", 2, False])
         if not result:
             return []
         raw_stats = result.get("mempool_health_statistics", [])

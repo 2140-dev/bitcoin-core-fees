@@ -77,10 +77,11 @@ def get_blockchain_info(chain: Optional[str] = None) -> Dict[str, Any]:
 def estimate_smart_fee(
     conf_target: int,
     mode: str = "unset",
-    verbosity_level: int = 2,
+    verbosity: int = 2,
+    block_policy_only: bool = False,
     chain: Optional[str] = None,
 ) -> Dict[str, Any]:
-    return get_client(chain).estimate_smart_fee(conf_target, mode, verbosity_level)
+    return get_client(chain).estimate_smart_fee(conf_target, mode, verbosity, block_policy_only)
 
 
 def get_mempool_feerate_diagram_analysis(chain: Optional[str] = None) -> Dict[str, Any]:
