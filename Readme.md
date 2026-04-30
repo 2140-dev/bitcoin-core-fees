@@ -103,6 +103,10 @@ Returns a fee rate estimate from Bitcoin Core's `estimatesmartfee`.
 | `mode`    | string | `economical`, `conservative`, or `unset` |
 | `level`   | int    | Verbosity level passed to `estimatesmartfee` (PR #34075) |
 
+| Query param          | Default | Description |
+|----------------------|---------|-------------|
+| `block_policy_only`  | `false` | When `true`, restricts estimation to the block policy estimator only. When `false`, Bitcoin Core may use additional estimators and includes an `estimator` field in the response naming the one chosen. |
+
 ```
 GET /fees/2/economical/2?chain=signet
 ```
@@ -112,6 +116,7 @@ GET /fees/2/economical/2?chain=signet
   "feerate": 0.00001000,
   "feerate_sat_per_vb": 1.0,
   "blocks": 2,
+  "estimator": "mempool",
   "chain": "signet"
 }
 ```

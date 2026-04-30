@@ -31,6 +31,8 @@ export interface FeeEstimateResponse {
   errors?: string[];
   /** Chain name ("main" | "test" | "testnet4" | "signet" | "regtest"). */
   chain: string;
+  /** The estimator used (only present when block_policy_only=false). */
+  estimator?: string;
 }
 
 export interface NetworkInfo {

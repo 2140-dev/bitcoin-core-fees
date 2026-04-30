@@ -29,6 +29,11 @@ export default function FeeCard({ label, target, data, loading, updating }: Prop
             <p className="text-[10px] text-[var(--text-secondary)] font-mono mt-2 tracking-wide">
               {target === 2 ? "1–2 blocks" : `within ${target} blocks`}
             </p>
+            {data?.estimator && (
+              <p className="text-[10px] text-orange-500/70 font-mono mt-1 tracking-widest uppercase">
+                {data.estimator}
+              </p>
+            )}
           </div>
         )}
       </div>

@@ -21,7 +21,7 @@ describe('BitcoinCoreAPI', () => {
     });
 
     const result = await api.getFeeEstimate(2, 'economical', 2, 'main');
-    expect(fetchMock).toHaveBeenCalledWith('http://test-api:5001/fees/2/economical/2?chain=main', undefined);
+    expect(fetchMock).toHaveBeenCalledWith('http://test-api:5001/fees/2/economical/2?chain=main&block_policy_only=false', undefined);
     expect(result.feerate).toBe(0.0001);
   });
 

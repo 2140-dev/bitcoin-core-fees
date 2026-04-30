@@ -111,7 +111,7 @@ class TestApp(unittest.TestCase):
         with patch('services.rpc_service._get_registry', return_value=mock_reg), \
              patch('services.rpc_service.estimate_smart_fee', return_value={"feerate": 0.0001}) as mock:
             self.client.get('/fees/2/economical/2?chain=signet')
-            mock.assert_called_once_with(conf_target=2, mode='economical', verbosity_level=2, chain='signet')
+            mock.assert_called_once_with(conf_target=2, mode='economical', verbosity=2, block_policy_only=False, chain='signet')
 
     def test_fees_all_valid_modes_accepted(self):
         for mode in ('economical', 'conservative', 'unset'):
