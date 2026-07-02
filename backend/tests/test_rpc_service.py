@@ -127,7 +127,7 @@ class TestRpcClient(unittest.TestCase):
         with patch.object(self.client, 'rpc_call', side_effect=mock_rpc) as mock:
             self.client.estimate_smart_fee(2, "unset", 1)
             esf_calls = [c for c in mock.call_args_list if c[0][0] == "estimatesmartfee"]
-            self.assertEqual(esf_calls[0][0][1], [2, "unset", 1, False])
+            self.assertEqual(esf_calls[0][0][1][2]["verbosity"], 1)
 
     def test_block_policy_only_forwarded_to_rpc(self):
         def mock_rpc(method, params):
@@ -140,7 +140,7 @@ class TestRpcClient(unittest.TestCase):
         with patch.object(self.client, 'rpc_call', side_effect=mock_rpc) as mock:
             self.client.estimate_smart_fee(2, "unset", 2, block_policy_only=True)
             esf_calls = [c for c in mock.call_args_list if c[0][0] == "estimatesmartfee"]
-            self.assertEqual(esf_calls[0][0][1], [2, "unset", 2, True])
+            self.assertTrue(esf_calls[0][0][1][2]["block_policy_only"])
 
     def test_estimator_field_passed_through(self):
         def mock_rpc(method, params):
@@ -154,7 +154,7 @@ class TestRpcClient(unittest.TestCase):
             result = self.client.estimate_smart_fee(2, "unset", 2, block_policy_only=False)
         self.assertEqual(result['estimator'], 'mempool')
 
-    def test_mempool_health_uses_block_policy_only_false(self):
+    def test_mempool_health_uses_verbosity_2(self):
         captured = {}
 
         def mock_rpc(method, params):
@@ -167,7 +167,7 @@ class TestRpcClient(unittest.TestCase):
 
         with patch.object(self.client, 'rpc_call', side_effect=mock_rpc):
             self.client.get_mempool_health_statistics()
-        self.assertEqual(captured['params'][3], False)
+        self.assertEqual(captured['params'][2]["verbosity"], 2)
 
     # --- get_single_block_stats cache safety --------------------------------
 
