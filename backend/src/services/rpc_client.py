@@ -136,7 +136,7 @@ class RpcClient:
         estimators and returns an ``estimator`` field naming the one chosen.
         """
         effective_target = _clamp_target(conf_target)
-        result = self.rpc_call("estimatesmartfee", [effective_target, mode, verbosity, block_policy_only])
+        result = self.rpc_call("estimatesmartfee", [effective_target, mode, {"verbosity": verbosity, "block_policy_only": block_policy_only}])
         if result and "feerate" in result:
             result["feerate_sat_per_vb"] = result["feerate"] * 100_000
         if result is not None:
@@ -149,7 +149,7 @@ class RpcClient:
         verbosity=2 includes mempool_health_statistics in the response, but only
         when block_policy_only=False.
         """
-        result = self.rpc_call("estimatesmartfee", [2, "unset", 2, False])
+        result = self.rpc_call("estimatesmartfee", [2, "unset", {"verbosity": 2}])
         if not result:
             return []
         raw_stats = result.get("mempool_health_statistics", [])
