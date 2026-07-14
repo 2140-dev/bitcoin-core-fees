@@ -140,7 +140,7 @@ class TestRpcClient(unittest.TestCase):
         with patch.object(self.client, 'rpc_call', side_effect=mock_rpc) as mock:
             self.client.estimate_smart_fee(2, "unset", 2, block_policy_only=True)
             esf_calls = [c for c in mock.call_args_list if c[0][0] == "estimatesmartfee"]
-            self.assertTrue(esf_calls[0][0][1][2]["block_policy_only"])
+            self.assertEqual(esf_calls[0][0][1][2]["fee_rate_estimator"], "block_policy")
 
     def test_estimator_field_passed_through(self):
         def mock_rpc(method, params):
