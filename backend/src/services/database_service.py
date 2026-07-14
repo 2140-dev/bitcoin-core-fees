@@ -43,9 +43,15 @@ def init_db(chain: str = "main"):
                     target INTEGER,
                     estimate_feerate REAL,
                     expected_height INTEGER,
+                    block_policy_only INTEGER DEFAULT 0,
                     timestamp DATETIME DEFAULT CURRENT_TIMESTAMP  -- UTC
                 )
             ''')
+            # Migration: add block_policy_only column for existing databases.
+            try:
+                cursor.execute('ALTER TABLE fee_estimates ADD COLUMN block_policy_only INTEGER DEFAULT 0')
+            except sqlite3.OperationalError:
+                pass  # column already exists
             cursor.execute('CREATE INDEX IF NOT EXISTS idx_poll_height ON fee_estimates(poll_height)')
             cursor.execute('CREATE INDEX IF NOT EXISTS idx_target ON fee_estimates(target)')
             cursor.execute('''
@@ -59,24 +65,24 @@ def init_db(chain: str = "main"):
         raise
 
 
-def save_estimate(poll_height, target, feerate, chain="main"):
+def save_estimate(poll_height, target, feerate, chain="main", block_policy_only: bool = False):
     expected_height = poll_height + target
     db_path = get_db_path(chain)
     try:
         with sqlite3.connect(db_path) as conn:
             cursor = conn.cursor()
             cursor.execute('''
-                INSERT INTO fee_estimates (poll_height, target, estimate_feerate, expected_height)
-                VALUES (?, ?, ?, ?)
-            ''', (poll_height, target, feerate, expected_height))
+                INSERT INTO fee_estimates (poll_height, target, estimate_feerate, expected_height, block_policy_only)
+                VALUES (?, ?, ?, ?, ?)
+            ''', (poll_height, target, feerate, expected_height, int(block_policy_only)))
             conn.commit()
-        logger.debug(f"Saved estimate: poll_height={poll_height}, target={target}, feerate={feerate}, chain={chain}")
+        logger.debug(f"Saved estimate: poll_height={poll_height}, target={target}, feerate={feerate}, block_policy_only={block_policy_only}, chain={chain}")
     except sqlite3.Error as e:
         logger.error(f"Failed to save estimate (poll_height={poll_height}, target={target}): {e}", exc_info=True)
         raise
 
 
-def get_estimates_in_range(start_height, end_height, target=2, chain="main"):
+def get_estimates_in_range(start_height, end_height, target=2, chain="main", block_policy_only: bool = False):
     if end_height - start_height > MAX_RANGE_BLOCKS:
         logger.warning(
             f"Requested range [{start_height}, {end_height}] exceeds MAX_RANGE_BLOCKS={MAX_RANGE_BLOCKS}. Clamping."
@@ -96,11 +102,11 @@ def get_estimates_in_range(start_height, end_height, target=2, chain="main"):
                                PARTITION BY poll_height, target ORDER BY timestamp ASC, id ASC
                            ) AS rn
                     FROM fee_estimates
-                    WHERE poll_height >= ? AND poll_height <= ? AND target = ?
+                    WHERE poll_height >= ? AND poll_height <= ? AND target = ? AND block_policy_only = ?
                 )
                 WHERE rn = 1
                 ORDER BY poll_height ASC
-            ''', (start_height, end_height, target))
+            ''', (start_height, end_height, target, int(block_policy_only)))
             rows = cursor.fetchall()
 
         if not rows:
