@@ -136,7 +136,8 @@ class RpcClient:
         estimators and returns an ``estimator`` field naming the one chosen.
         """
         effective_target = _clamp_target(conf_target)
-        result = self.rpc_call("estimatesmartfee", [effective_target, mode, {"verbosity": verbosity, "block_policy_only": block_policy_only}])
+        fee_rate_estimator = "block_policy" if block_policy_only else "none"
+        result = self.rpc_call("estimatesmartfee", [effective_target, mode, {"verbosity": verbosity, "fee_rate_estimator": fee_rate_estimator}])
         if result and "feerate" in result:
             result["feerate_sat_per_vb"] = result["feerate"] * 100_000
         if result is not None:
