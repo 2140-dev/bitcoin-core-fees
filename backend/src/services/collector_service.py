@@ -30,6 +30,16 @@ def _run_collector_for_chain(chain: str):
                         )
                 except Exception as e:
                     logger.error(f"[Collector:{display}] Failed for target {t}: {e}")
+                try:
+                    bp_res = client.estimate_smart_fee(t, "unset", 1, block_policy_only=True)
+                    if "feerate_sat_per_vb" in bp_res:
+                        bp_rate = bp_res["feerate_sat_per_vb"]
+                        db_service.save_estimate(current_height, t, bp_rate, chain=chain, block_policy_only=True)
+                        logger.info(
+                            f"[Collector:{display}] SAVED (block_policy): target={t} height={current_height} rate={bp_rate:.2f} sat/vB"
+                        )
+                except Exception as e:
+                    logger.error(f"[Collector:{display}] Failed block_policy for target {t}: {e}")
         except Exception as e:
             logger.error(f"[Collector:{display}] Loop error: {e}")
 
