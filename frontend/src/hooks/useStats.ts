@@ -4,7 +4,7 @@ import { AnalyticsSummary, PerformanceData } from "../types/api";
 import { statsCache } from "../lib/statsCache";
 
 export function useStats(target: number = 2, chain?: string) {
-  const [performanceData, setPerformanceData] = useState<PerformanceData>({ blocks: [], estimates: [] });
+  const [performanceData, setPerformanceData] = useState<PerformanceData>({ blocks: [], estimates: [], block_policy_estimates: [] });
   const [summary, setSummary] = useState<AnalyticsSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -102,6 +102,7 @@ export function useStats(target: number = 2, chain?: string) {
   return {
     blocks: performanceData.blocks,
     estimates: performanceData.estimates,
+    blockPolicyEstimates: performanceData.block_policy_estimates,
     summary,
     loading,
     error,

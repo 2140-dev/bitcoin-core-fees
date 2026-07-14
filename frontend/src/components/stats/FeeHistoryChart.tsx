@@ -6,16 +6,18 @@ import * as d3 from "d3";
 interface Props {
   blocks: { height: number; low: number; high: number }[];
   estimates: { height: number; rate: number }[];
+  blockPolicyEstimates: { height: number; rate: number }[];
   loading: boolean;
   scaleType: "log" | "linear";
 }
 
-export default function FeeHistoryChart({ blocks, estimates, loading, scaleType }: Props) {
+export default function FeeHistoryChart({ blocks, estimates, blockPolicyEstimates, loading, scaleType }: Props) {
   const svgRef = useRef<SVGSVGElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!svgRef.current || !containerRef.current || loading || blocks.length === 0) return;
+
 
     // Read theme tokens so the chart adapts to light/dark mode.
     const style = getComputedStyle(document.documentElement);
@@ -53,12 +55,14 @@ export default function FeeHistoryChart({ blocks, estimates, loading, scaleType 
 
     // 1. CLIPPING: Only show estimates that fall within the block height range
     const visibleEstimates = estimates.filter(e => e.height >= xDomain[0] && e.height <= xDomain[1]);
+    const visibleBpEstimates = blockPolicyEstimates.filter(e => e.height >= xDomain[0] && e.height <= xDomain[1]);
 
     const yMaxBlocks = d3.max(blocks, d => d.high) || 100;
     const yMaxEstimates = d3.max(visibleEstimates, d => d.rate) || 0;
+    const yMaxBpEstimates = d3.max(visibleBpEstimates, d => d.rate) || 0;
     
     // Generous top padding (20%) to ensure highest rate is visible
-    const yMax = Math.max(yMaxBlocks, yMaxEstimates) * 1.2;
+    const yMax = Math.max(yMaxBlocks, yMaxEstimates, yMaxBpEstimates) * 1.2;
 
     // 2. SCALE PADDING: Start slightly below 0 (-0.5 or -1) for better visualization
     const yMin = scaleType === "log" ? -0.1 : -0.5;
@@ -90,13 +94,13 @@ export default function FeeHistoryChart({ blocks, estimates, loading, scaleType 
       .attr("fill-opacity", 0.45)
       .attr("d", area);
 
+    const estimateLine = d3.line<any>()
+      .x(d => x(d.height))
+      .y(d => y(d.rate))
+      .curve(d3.curveMonotoneX);
+
     // 4. Fee Estimate Line (Clipped to blocks)
     if (visibleEstimates.length > 0) {
-      const line = d3.line<any>()
-        .x(d => x(d.height))
-        .y(d => y(d.rate))
-        .curve(d3.curveMonotoneX);
-
       svg.append("path")
         .datum(visibleEstimates.sort((a, b) => a.height - b.height))
         .attr("fill", "none")
@@ -104,7 +108,19 @@ export default function FeeHistoryChart({ blocks, estimates, loading, scaleType 
         .attr("stroke-width", 2.5)
         .attr("stroke-linejoin", "round")
         .attr("stroke-linecap", "round")
-        .attr("d", line);
+        .attr("d", estimateLine);
+    }
+
+    // 5. Block Policy Estimate Line
+    if (visibleBpEstimates.length > 0) {
+      svg.append("path")
+        .datum(visibleBpEstimates.sort((a, b) => a.height - b.height))
+        .attr("fill", "none")
+        .attr("stroke", "#d97706")
+        .attr("stroke-width", 2.5)
+        .attr("stroke-linejoin", "round")
+        .attr("stroke-linecap", "round")
+        .attr("d", estimateLine);
     }
 
     // Axes
@@ -177,6 +193,9 @@ export default function FeeHistoryChart({ blocks, estimates, loading, scaleType 
     const mouseG = svg.append("g").style("opacity", 0);
     mouseG.append("circle").attr("r", 4).attr("fill", "#3b82f6").attr("stroke", "#fff").attr("stroke-width", 2);
 
+    const mouseGBp = svg.append("g").style("opacity", 0);
+    mouseGBp.append("circle").attr("r", 4).attr("fill", "#d97706").attr("stroke", "#fff").attr("stroke-width", 2);
+
     svg.append("rect")
       .attr("width", width)
       .attr("height", height)
@@ -187,12 +206,16 @@ export default function FeeHistoryChart({ blocks, estimates, loading, scaleType 
         
         const b = blocks.find(b => b.height === heightVal);
         const e = visibleEstimates.find(e => Math.round(e.height) === heightVal);
+        const bp = visibleBpEstimates.find(e => Math.round(e.height) === heightVal);
 
         if (b) {
           mouseLine.attr("x1", x(heightVal)).attr("x2", x(heightVal)).attr("y1", 0).attr("y2", height).style("opacity", 1);
-          
+
           if (e) {
             mouseG.attr("transform", `translate(${x(heightVal)},${y(e.rate)})`).style("opacity", 1);
+          }
+          if (bp) {
+            mouseGBp.attr("transform", `translate(${x(heightVal)},${y(bp.rate)})`).style("opacity", 1);
           }
 
           tooltip
@@ -211,6 +234,11 @@ export default function FeeHistoryChart({ blocks, estimates, loading, scaleType 
                   <span class="text-[#3b82f6] font-bold">Estimate:</span>
                   <span class="font-mono font-black text-[#3b82f6]">${e.rate.toFixed(2)}</span>
                 </div>` : ''}
+                ${bp ? `
+                <div class="flex justify-between gap-4">
+                  <span class="text-[#d97706] font-bold">Block policy:</span>
+                  <span class="font-mono font-black text-[#d97706]">${bp.rate.toFixed(2)}</span>
+                </div>` : ''}
               </div>
             `);
         }
@@ -219,9 +247,10 @@ export default function FeeHistoryChart({ blocks, estimates, loading, scaleType 
         tooltip.style("visibility", "hidden");
         mouseLine.style("opacity", 0);
         mouseG.style("opacity", 0);
+        mouseGBp.style("opacity", 0);
       });
 
-  }, [blocks, estimates, loading, scaleType]);
+  }, [blocks, estimates, blockPolicyEstimates, loading, scaleType]);
 
   return (
     <div ref={containerRef} className="w-full h-full min-h-[500px] relative">

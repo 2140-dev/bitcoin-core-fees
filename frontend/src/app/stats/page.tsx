@@ -15,6 +15,7 @@ export default function StatsPage() {
   const {
     blocks,
     estimates,
+    blockPolicyEstimates,
     summary,
     loading,
     error,
@@ -171,6 +172,7 @@ export default function StatsPage() {
             <div className="flex gap-4 text-[9px] font-medium uppercase tracking-wider text-[var(--muted)] bg-[var(--surface-2)] px-4 py-2 rounded-lg border border-[var(--card-border)]">
               <div className="flex items-center gap-1.5"><div className="w-2.5 h-2.5 bg-[var(--muted)] opacity-40 rounded-sm"></div> p10–p90 range</div>
               <div className="flex items-center gap-1.5"><div className="w-2.5 h-0.5 bg-[var(--data-blue)] rounded-full"></div> Fee estimate</div>
+              <div className="flex items-center gap-1.5"><div className="w-2.5 h-0.5 rounded-full" style={{backgroundColor: "#d97706"}}></div> Block policy</div>
             </div>
           </div>
           
@@ -181,7 +183,7 @@ export default function StatsPage() {
                 <p className="text-[var(--muted)] text-[10px] font-mono uppercase tracking-[0.3em] animate-pulse">Syncing data...</p>
               </div>
             ) : hasBlocks ? (
-              <FeeHistoryChart blocks={blocks} estimates={estimates} loading={loading} scaleType={scaleType} />
+              <FeeHistoryChart blocks={blocks} estimates={estimates} blockPolicyEstimates={blockPolicyEstimates} loading={loading} scaleType={scaleType} />
             ) : (
               <div className="flex flex-col items-center gap-4 py-20 text-[var(--muted)]">
                 <Database className="w-12 h-12 opacity-20" />
