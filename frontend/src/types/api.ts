@@ -66,4 +66,5 @@ export interface PerformanceDataEstimate {
 export interface PerformanceData {
   blocks: PerformanceDataBlock[];
   estimates: PerformanceDataEstimate[];
+  block_policy_estimates: PerformanceDataEstimate[];
 }
