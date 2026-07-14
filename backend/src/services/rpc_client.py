@@ -302,9 +302,15 @@ class RpcClient:
         db_rows = db_service.get_estimates_in_range(
             start_height, start_height + count, effective_target, chain=self.chain,
         )
+        bp_rows = db_service.get_estimates_in_range(
+            start_height, start_height + count, effective_target, chain=self.chain, block_policy_only=True,
+        )
 
         latest_estimates_map = {row["poll_height"]: row["estimate_feerate"] for row in db_rows}
         estimates = [{"height": h, "rate": latest_estimates_map[h]} for h in sorted(latest_estimates_map)]
+
+        latest_bp_map = {row["poll_height"]: row["estimate_feerate"] for row in bp_rows}
+        block_policy_estimates = [{"height": h, "rate": latest_bp_map[h]} for h in sorted(latest_bp_map)]
 
         heights = list(range(start_height, start_height + count))
         block_stats = self._fetch_block_stats_parallel(heights)
@@ -317,7 +323,7 @@ class RpcClient:
             p = stats.get("feerate_percentiles", [0, 0, 0, 0, 0])
             blocks.append({"height": h, "low": p[0], "high": p[4]})
 
-        return {"blocks": blocks, "estimates": estimates}
+        return {"blocks": blocks, "estimates": estimates, "block_policy_estimates": block_policy_estimates}
 
     def calculate_local_summary(self, target: int = 2, start_height: Optional[int] = None) -> Dict[str, Any]:
         """Classify stored fee estimates as within-range, overpaid, or underpaid.
