@@ -166,6 +166,28 @@ class TestDatabaseService(unittest.TestCase):
         rows = self.db.get_estimates_in_range(800000, 800000, target=2)
         self.assertGreaterEqual(len(rows), 1)
 
+    # --- block_policy_only filtering ----------------------------------------
+
+    def test_block_policy_only_saved_and_retrieved_separately(self):
+        self.db.save_estimate(800000, target=2, feerate=10.0, block_policy_only=False)
+        self.db.save_estimate(800000, target=2, feerate=12.0, block_policy_only=True)
+
+        combined = self.db.get_estimates_in_range(800000, 800000, target=2, block_policy_only=False)
+        bp = self.db.get_estimates_in_range(800000, 800000, target=2, block_policy_only=True)
+
+        self.assertEqual(len(combined), 1)
+        self.assertAlmostEqual(combined[0]['estimate_feerate'], 10.0)
+        self.assertEqual(len(bp), 1)
+        self.assertAlmostEqual(bp[0]['estimate_feerate'], 12.0)
+
+    def test_default_excludes_block_policy_only(self):
+        self.db.save_estimate(800000, target=2, feerate=10.0)
+        self.db.save_estimate(800000, target=2, feerate=12.0, block_policy_only=True)
+
+        rows = self.db.get_estimates_in_range(800000, 800000, target=2)
+        self.assertEqual(len(rows), 1)
+        self.assertAlmostEqual(rows[0]['estimate_feerate'], 10.0)
+
     # --- get_db_height_range ------------------------------------------------
 
     def test_height_range_empty_db(self):
