@@ -230,9 +230,13 @@ export default function FeeHistoryChart({ blocks, estimates, blockPolicyEstimate
 
           if (e) {
             mouseG.attr("transform", `translate(${x(heightVal)},${y(e.rate)})`).style("opacity", 1);
+          } else {
+            mouseG.style("opacity", 0);
           }
           if (bp) {
             mouseGBp.attr("transform", `translate(${x(heightVal)},${y(bp.rate)})`).style("opacity", 1);
+          } else {
+            mouseGBp.style("opacity", 0);
           }
 
           tooltip
