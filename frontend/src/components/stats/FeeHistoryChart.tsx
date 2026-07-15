@@ -99,10 +99,27 @@ export default function FeeHistoryChart({ blocks, estimates, blockPolicyEstimate
       .y(d => y(d.rate))
       .curve(d3.curveMonotoneX);
 
+    // Split sorted estimates into contiguous segments (consecutive block heights)
+    // so gaps in data show as breaks in the line, not smooth interpolations.
+    function splitIntoSegments(data: { height: number; rate: number }[]) {
+      const sorted = [...data].sort((a, b) => a.height - b.height);
+      const segments: typeof sorted[] = [];
+      let current: typeof sorted = [];
+      for (const pt of sorted) {
+        if (current.length > 0 && pt.height - current[current.length - 1].height > 1) {
+          segments.push(current);
+          current = [];
+        }
+        current.push(pt);
+      }
+      if (current.length > 0) segments.push(current);
+      return segments;
+    }
+
     // 4. Fee Estimate Line (Clipped to blocks)
-    if (visibleEstimates.length > 0) {
+    for (const segment of splitIntoSegments(visibleEstimates)) {
       svg.append("path")
-        .datum(visibleEstimates.sort((a, b) => a.height - b.height))
+        .datum(segment)
         .attr("fill", "none")
         .attr("stroke", C.dataBlue)
         .attr("stroke-width", 2.5)
@@ -112,9 +129,9 @@ export default function FeeHistoryChart({ blocks, estimates, blockPolicyEstimate
     }
 
     // 5. Block Policy Estimate Line
-    if (visibleBpEstimates.length > 0) {
+    for (const segment of splitIntoSegments(visibleBpEstimates)) {
       svg.append("path")
-        .datum(visibleBpEstimates.sort((a, b) => a.height - b.height))
+        .datum(segment)
         .attr("fill", "none")
         .attr("stroke", "#d97706")
         .attr("stroke-width", 2.5)
