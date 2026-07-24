@@ -13,6 +13,21 @@ DB_FILENAME = "fee_analysis.db"
 
 MAX_RANGE_BLOCKS = 10_000  # safety cap on get_estimates_in_range
 
+# Seconds to wait when the database is locked by another process/thread.
+_BUSY_TIMEOUT_SECONDS = 10
+
+
+def _connect(db_path: str) -> sqlite3.Connection:
+    """Open a SQLite connection with WAL mode and a busy timeout.
+
+    WAL (Write-Ahead Logging) allows concurrent readers while a writer holds
+    the lock.  The busy timeout makes writers/readers retry instead of raising
+    ``database is locked`` immediately.
+    """
+    conn = sqlite3.connect(db_path, timeout=_BUSY_TIMEOUT_SECONDS)
+    conn.execute("PRAGMA journal_mode=WAL")
+    return conn
+
 # Bitcoin Core–style subdirectories per network
 CHAIN_DIR_MAP = {
     "main": "",
@@ -34,7 +49,7 @@ def init_db(chain: str = "main"):
     db_path = get_db_path(chain)
     os.makedirs(os.path.dirname(db_path), exist_ok=True)
     try:
-        with sqlite3.connect(db_path) as conn:
+        with _connect(db_path) as conn:
             cursor = conn.cursor()
             cursor.execute('''
                 CREATE TABLE IF NOT EXISTS fee_estimates (
@@ -69,7 +84,7 @@ def save_estimate(poll_height, target, feerate, chain="main", block_policy_only:
     expected_height = poll_height + target
     db_path = get_db_path(chain)
     try:
-        with sqlite3.connect(db_path) as conn:
+        with _connect(db_path) as conn:
             cursor = conn.cursor()
             cursor.execute('''
                 INSERT INTO fee_estimates (poll_height, target, estimate_feerate, expected_height, block_policy_only)
@@ -91,7 +106,7 @@ def get_estimates_in_range(start_height, end_height, target=2, chain="main", blo
 
     db_path = get_db_path(chain)
     try:
-        with sqlite3.connect(db_path) as conn:
+        with _connect(db_path) as conn:
             conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
             cursor.execute('''
@@ -121,7 +136,7 @@ def get_estimates_in_range(start_height, end_height, target=2, chain="main", blo
 def get_db_height_range(target=2, chain="main"):
     db_path = get_db_path(chain)
     try:
-        with sqlite3.connect(db_path) as conn:
+        with _connect(db_path) as conn:
             cursor = conn.cursor()
             cursor.execute(
                 'SELECT MIN(poll_height), MAX(poll_height) FROM fee_estimates WHERE target = ?',
