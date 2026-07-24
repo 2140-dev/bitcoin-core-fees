@@ -188,6 +188,26 @@ class TestDatabaseService(unittest.TestCase):
         self.assertEqual(len(rows), 1)
         self.assertAlmostEqual(rows[0]['estimate_feerate'], 10.0)
 
+    # --- WAL mode -----------------------------------------------------------
+
+    def test_connections_use_wal_journal_mode(self):
+        db_path = self.db.get_db_path()
+        conn = self.db._connect(db_path)
+        cursor = conn.cursor()
+        cursor.execute("PRAGMA journal_mode")
+        mode = cursor.fetchone()[0]
+        conn.close()
+        self.assertEqual(mode, "wal")
+
+    def test_connections_have_busy_timeout(self):
+        db_path = self.db.get_db_path()
+        conn = self.db._connect(db_path)
+        cursor = conn.cursor()
+        cursor.execute("PRAGMA busy_timeout")
+        timeout_ms = cursor.fetchone()[0]
+        conn.close()
+        self.assertEqual(timeout_ms, self.db._BUSY_TIMEOUT_SECONDS * 1000)
+
     # --- get_db_height_range ------------------------------------------------
 
     def test_height_range_empty_db(self):
