@@ -1,3 +1,5 @@
+import fcntl
+import os
 import time
 import threading
 import logging
@@ -6,6 +8,8 @@ import services.database_service as db_service
 
 logger = logging.getLogger("collector")
 _collectors_started = False
+# Held open for the process lifetime so the flock persists.
+_lock_fd = None
 
 
 def _run_collector_for_chain(chain: str):
@@ -51,11 +55,28 @@ def _run_collector_for_chain(chain: str):
 
 
 def start_background_collectors():
-    """Spawn one collector thread per registered chain."""
-    global _collectors_started
+    """Spawn one collector thread per registered chain.
+
+    With multi-worker servers (e.g. gunicorn --workers 4) each worker process
+    calls this function.  A file lock ensures only one process actually starts
+    the collector threads — the rest silently skip.
+    """
+    global _collectors_started, _lock_fd
     if _collectors_started:
         logger.warning("Collectors already running, skipping.")
         return
+
+    lock_path = db_service.get_db_path("main") + ".collector.lock"
+    os.makedirs(os.path.dirname(lock_path), exist_ok=True)
+    _lock_fd = open(lock_path, "w")
+    try:
+        fcntl.flock(_lock_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except OSError:
+        logger.info("Another worker owns the collector lock — skipping.")
+        _lock_fd.close()
+        _lock_fd = None
+        return
+
     _collectors_started = True
 
     chains = rpc_service.registry.chains()
