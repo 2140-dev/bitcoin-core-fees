@@ -57,6 +57,8 @@ class RpcClient:
         self._password = password
         self._session = requests.Session()
         self._chain: Optional[str] = None
+        # None = untested, True = node accepts 3rd options arg, False = standard 2-param only
+        self._extended_smartfee: Optional[bool] = None
 
     # ------------------------------------------------------------------
     # Chain identity
@@ -120,6 +122,32 @@ class RpcClient:
         display = CHAIN_DISPLAY_NAMES.get(chain, chain.upper())
         return {"chain": chain, "chain_display": display, "blockcount": blocks}
 
+    def _call_estimatesmartfee(self, conf_target: int, mode: str, options: Optional[Dict[str, Any]] = None) -> Any:
+        """Call estimatesmartfee with automatic fallback for standard nodes.
+
+        Nodes running a custom build accept a 3rd *options* dict (verbosity,
+        fee_rate_estimator).  Standard Bitcoin Core only accepts two positional
+        args.  On the first call we probe the node; once we know we cache the
+        result in ``_extended_smartfee`` so subsequent calls skip the probe.
+        """
+        if self._extended_smartfee is False or options is None:
+            return self.rpc_call("estimatesmartfee", [conf_target, mode])
+
+        try:
+            result = self.rpc_call("estimatesmartfee", [conf_target, mode, options])
+            self._extended_smartfee = True
+            return result
+        except RuntimeError as exc:
+            # When the node doesn't recognise the 3rd parameter it returns
+            # error code -1 with the help text.  Only that specific case
+            # should permanently disable the extended call.
+            msg = str(exc)
+            if "RPC Error (estimatesmartfee)" in msg and "conf_target" in msg:
+                logger.info("Node %s does not support extended estimatesmartfee — using standard call", self._url)
+                self._extended_smartfee = False
+                return self.rpc_call("estimatesmartfee", [conf_target, mode])
+            raise
+
     def estimate_smart_fee(
         self,
         conf_target: int,
@@ -136,8 +164,11 @@ class RpcClient:
         estimators and returns an ``estimator`` field naming the one chosen.
         """
         effective_target = _clamp_target(conf_target)
-        fee_rate_estimator = "block_policy" if block_policy_only else "none"
-        result = self.rpc_call("estimatesmartfee", [effective_target, mode, {"verbosity": verbosity, "fee_rate_estimator": fee_rate_estimator}])
+        fee_rate_estimator = "block_policy" if block_policy_only else "auto"
+        result = self._call_estimatesmartfee(
+            effective_target, mode,
+            {"verbosity": verbosity, "fee_rate_estimator": fee_rate_estimator},
+        )
         if result and "feerate" in result:
             result["feerate_sat_per_vb"] = result["feerate"] * 100_000
         if result is not None:
@@ -148,9 +179,10 @@ class RpcClient:
         """Return per-block mempool health stats via estimatesmartfee verbosity 2.
 
         verbosity=2 includes mempool_health_statistics in the response, but only
-        when block_policy_only=False.
+        when block_policy_only=False.  Standard nodes don't support this — returns
+        an empty list in that case.
         """
-        result = self.rpc_call("estimatesmartfee", [2, "unset", {"verbosity": 2}])
+        result = self._call_estimatesmartfee(2, "unset", {"verbosity": 2})
         if not result:
             return []
         raw_stats = result.get("mempool_health_statistics", [])
