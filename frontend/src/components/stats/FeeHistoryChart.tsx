@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useRef, useCallback } from "react";
 import * as d3 from "d3";
 
 interface Props {
@@ -14,10 +14,10 @@ interface Props {
 export default function FeeHistoryChart({ blocks, estimates, blockPolicyEstimates, loading, scaleType }: Props) {
   const svgRef = useRef<SVGSVGElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const tooltipRef = useRef<HTMLDivElement | null>(null);
 
-  useEffect(() => {
+  const draw = useCallback(() => {
     if (!svgRef.current || !containerRef.current || loading || blocks.length === 0) return;
-
 
     // Read theme tokens so the chart adapts to light/dark mode.
     const style = getComputedStyle(document.documentElement);
@@ -30,8 +30,29 @@ export default function FeeHistoryChart({ blocks, estimates, blockPolicyEstimate
       muted:     style.getPropertyValue("--muted").trim()      || "#6b7280",
     };
 
-    // Clear previous
+    // Clear previous SVG content
     d3.select(svgRef.current).selectAll("*").remove();
+
+    // Reuse or create tooltip div (never leak new ones)
+    if (!tooltipRef.current) {
+      tooltipRef.current = document.createElement("div");
+      tooltipRef.current.className = "chart-tooltip";
+      Object.assign(tooltipRef.current.style, {
+        position: "absolute",
+        visibility: "hidden",
+        background: "var(--card)",
+        border: "1px solid var(--card-border)",
+        padding: "12px",
+        borderRadius: "8px",
+        boxShadow: "0 10px 15px -3px rgba(0,0,0,0.1)",
+        pointerEvents: "none",
+        zIndex: "100",
+        color: "var(--foreground)",
+      });
+      containerRef.current.appendChild(tooltipRef.current);
+    }
+    const tooltipEl = tooltipRef.current;
+    tooltipEl.style.visibility = "hidden";
 
     const margin = { top: 50, right: 30, bottom: 70, left: 80 };
     const width = containerRef.current.clientWidth - margin.left - margin.right;
@@ -60,14 +81,14 @@ export default function FeeHistoryChart({ blocks, estimates, blockPolicyEstimate
     const yMaxBlocks = d3.max(blocks, d => d.high) || 100;
     const yMaxEstimates = d3.max(visibleEstimates, d => d.rate) || 0;
     const yMaxBpEstimates = d3.max(visibleBpEstimates, d => d.rate) || 0;
-    
+
     // Generous top padding (20%) to ensure highest rate is visible
     const yMax = Math.max(yMaxBlocks, yMaxEstimates, yMaxBpEstimates) * 1.2;
 
     // 2. SCALE PADDING: Start slightly below 0 (-0.5 or -1) for better visualization
     const yMin = scaleType === "log" ? -0.1 : -0.5;
 
-    const y = scaleType === "log" 
+    const y = scaleType === "log"
       ? d3.scaleSymlog().domain([yMin, yMax]).range([height, 0]).constant(1)
       : d3.scaleLinear().domain([yMin, yMax]).range([height, 0]);
 
@@ -186,21 +207,12 @@ export default function FeeHistoryChart({ blocks, estimates, blockPolicyEstimate
       .attr("fill", C.axis)
       .text("FEE RATE (sat/vB)");
 
-    // Interaction Tooltip
-    const tooltip = d3.select(containerRef.current)
-      .append("div")
-      .attr("class", "chart-tooltip")
-      .style("position", "absolute")
-      .style("visibility", "hidden")
-      .style("background", "var(--card)")
-      .style("border", "1px solid var(--card-border)")
-      .style("padding", "12px")
-      .style("border-radius", "8px")
-      .style("box-shadow", "0 10px 15px -3px rgba(0,0,0,0.1)")
-      .style("pointer-events", "none")
-      .style("z-index", "100")
-      .style("color", "var(--foreground)");
+    // Build O(1) lookup maps for tooltip (mousemove fires many times/sec)
+    const blockMap = new Map(blocks.map(b => [b.height, b]));
+    const estMap = new Map(visibleEstimates.map(e => [Math.round(e.height), e]));
+    const bpMap = new Map(visibleBpEstimates.map(e => [Math.round(e.height), e]));
 
+    // Interaction Tooltip
     const mouseLine = svg.append("line")
       .attr("stroke", "#666")
       .attr("stroke-width", 1)
@@ -220,10 +232,10 @@ export default function FeeHistoryChart({ blocks, estimates, blockPolicyEstimate
       .on("mousemove", (event) => {
         const [mouseX] = d3.pointer(event);
         const heightVal = Math.round(x.invert(mouseX));
-        
-        const b = blocks.find(b => b.height === heightVal);
-        const e = visibleEstimates.find(e => Math.round(e.height) === heightVal);
-        const bp = visibleBpEstimates.find(e => Math.round(e.height) === heightVal);
+
+        const b = blockMap.get(heightVal);
+        const e = estMap.get(heightVal);
+        const bp = bpMap.get(heightVal);
 
         if (b) {
           mouseLine.attr("x1", x(heightVal)).attr("x2", x(heightVal)).attr("y1", 0).attr("y2", height).style("opacity", 1);
@@ -239,39 +251,60 @@ export default function FeeHistoryChart({ blocks, estimates, blockPolicyEstimate
             mouseGBp.style("opacity", 0);
           }
 
-          tooltip
-            .style("visibility", "visible")
-            .style("left", `${event.pageX + 15}px`)
-            .style("top", `${event.pageY - 15}px`)
-            .html(`
-              <div class="space-y-1 text-xs">
-                <div class="font-black border-b border-[var(--card-border)] pb-1 mb-1">BLOCK #${heightVal}</div>
-                <div class="flex justify-between gap-4">
-                  <span class="text-[var(--muted)]">Range:</span>
-                  <span class="font-mono font-bold">${b.low.toFixed(1)} - ${b.high.toFixed(1)}</span>
-                </div>
-                ${e ? `
-                <div class="flex justify-between gap-4">
-                  <span class="text-[#3b82f6] font-bold">Estimate:</span>
-                  <span class="font-mono font-black text-[#3b82f6]">${e.rate.toFixed(2)}</span>
-                </div>` : ''}
-                ${bp ? `
-                <div class="flex justify-between gap-4">
-                  <span class="text-[#d97706] font-bold">Block policy:</span>
-                  <span class="font-mono font-black text-[#d97706]">${bp.rate.toFixed(2)}</span>
-                </div>` : ''}
+          // Position tooltip relative to the container, not the page
+          const containerRect = containerRef.current!.getBoundingClientRect();
+          tooltipEl.style.visibility = "visible";
+          tooltipEl.style.left = `${event.clientX - containerRect.left + 15}px`;
+          tooltipEl.style.top = `${event.clientY - containerRect.top - 15}px`;
+          tooltipEl.innerHTML = `
+            <div class="space-y-1 text-xs">
+              <div class="font-black border-b border-[var(--card-border)] pb-1 mb-1">BLOCK #${heightVal}</div>
+              <div class="flex justify-between gap-4">
+                <span class="text-[var(--muted)]">Range:</span>
+                <span class="font-mono font-bold">${b.low.toFixed(1)} - ${b.high.toFixed(1)}</span>
               </div>
-            `);
+              ${e ? `
+              <div class="flex justify-between gap-4">
+                <span class="text-[#3b82f6] font-bold">Estimate:</span>
+                <span class="font-mono font-black text-[#3b82f6]">${e.rate.toFixed(2)}</span>
+              </div>` : ''}
+              ${bp ? `
+              <div class="flex justify-between gap-4">
+                <span class="text-[#d97706] font-bold">Block policy:</span>
+                <span class="font-mono font-black text-[#d97706]">${bp.rate.toFixed(2)}</span>
+              </div>` : ''}
+            </div>
+          `;
         }
       })
       .on("mouseleave", () => {
-        tooltip.style("visibility", "hidden");
+        tooltipEl.style.visibility = "hidden";
         mouseLine.style("opacity", 0);
         mouseG.style("opacity", 0);
         mouseGBp.style("opacity", 0);
       });
 
   }, [blocks, estimates, blockPolicyEstimates, loading, scaleType]);
+
+  // Draw on data change and resize
+  useEffect(() => {
+    draw();
+
+    const container = containerRef.current;
+    if (!container) return;
+
+    const ro = new ResizeObserver(() => draw());
+    ro.observe(container);
+
+    return () => {
+      ro.disconnect();
+      // Clean up tooltip on unmount
+      if (tooltipRef.current && tooltipRef.current.parentNode) {
+        tooltipRef.current.parentNode.removeChild(tooltipRef.current);
+        tooltipRef.current = null;
+      }
+    };
+  }, [draw]);
 
   return (
     <div ref={containerRef} className="w-full h-full min-h-[500px] relative">

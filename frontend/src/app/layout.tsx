@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { NetworkProvider } from "../context/NetworkContext";
+import { Header } from "../components/common/Header";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -34,11 +35,17 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+        className={`${geistSans.variable} ${geistMono.variable} antialiased min-h-screen bg-[var(--background)] text-[var(--foreground)] selection:bg-orange-500/30 font-sans`}
         suppressHydrationWarning
       >
         <NetworkProvider>
+          <Header />
           {children}
+          <footer className="py-12 border-t border-[var(--card-border)] opacity-50">
+            <div className="max-w-7xl mx-auto px-4 text-center text-[var(--muted)] text-[10px] font-mono uppercase tracking-[0.3em]">
+              Powered by Bitcoin Core RPC
+            </div>
+          </footer>
         </NetworkProvider>
       </body>
     </html>
