@@ -37,7 +37,7 @@ def create_app():
     for chain in rpc_service.registry.chains():
         db_service.init_db(chain=chain)
 
-    collector_service.start_background_collectors()
+    is_primary_worker = collector_service.start_background_collectors()
 
     # ---------------------------------------------------------------------------
     # Helper — resolve ?chain= query param (defaults to first registered chain)
@@ -182,8 +182,12 @@ def create_app():
                 _rebuild_snapshot()
             time.sleep(6 * 3600)
 
-    _rebuild_snapshot()
-    threading.Thread(target=_snapshot_loop, daemon=True).start()
+    # Only the primary worker (the one holding the collector lock) rebuilds the
+    # snapshot, so multiple gunicorn workers don't race on the shared .tmp file
+    # and os.replace. Every worker can still serve the finished file below.
+    if is_primary_worker:
+        _rebuild_snapshot()
+        threading.Thread(target=_snapshot_loop, daemon=True).start()
 
     @app.route("/data/snapshot", methods=['GET'])
     @limiter.limit("2 per hour")
