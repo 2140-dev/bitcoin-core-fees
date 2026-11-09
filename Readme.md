@@ -17,7 +17,7 @@ This project tracks `estimatesmartfee` from a Bitcoin Core node and compares tho
 #### Architecture
 
 - **Backend (Python/Flask)**: Communicates with Bitcoin Core via RPC. Collects estimates into SQLite and serves data via a REST API.
-- **Frontend (Next.js/TypeScript)**: Modern UI using Recharts and D3. Communicates with the backend via a secure API proxy route.
+- **Frontend (Next.js/TypeScript)**: Modern UI using D3. Communicates with the backend via a secure API proxy route.
 
 #### Project Structure
 
@@ -29,6 +29,7 @@ This project tracks `estimatesmartfee` from a Bitcoin Core node and compares tho
 ├── frontend/           # Next.js web application
 │   ├── src/app/        # App router and pages
 │   └── src/components/ # D3 and Recharts visualization components
+├── scripts/            # Helper scripts (data import, etc.)
 └── .github/workflows/  # Automated testing workflow
 ```
 
@@ -230,6 +231,41 @@ GET /fees-sum/944000/?target=2&chain=main
   "underpayment_val": 25, "underpayment_perc": 0.026
 }
 ```
+
+---
+
+#### `GET /data/snapshot`
+
+Downloads all collected fee estimation databases as a single `tar.gz` archive. Rate-limited to 2 requests per hour.
+
+```
+GET /data/snapshot
+```
+
+Returns a `fee_data.tar.gz` containing:
+```
+fee_analysis.db            # mainnet
+signet/fee_analysis.db     # signet
+testnet4/fee_analysis.db   # testnet4
+```
+
+---
+
+### Pre-collected Data
+
+To bootstrap a new server with historical fee data instead of collecting from scratch, download the snapshot from a running instance:
+
+```bash
+./scripts/import-data.sh
+```
+
+Or manually:
+
+```bash
+curl -fSL https://bitcoincorefeerate.com/api/data/snapshot | tar xzf - -C backend/src/services/
+```
+
+This extracts the databases into the correct locations. The backend picks them up on next start — no extra configuration needed.
 
 ---
 
