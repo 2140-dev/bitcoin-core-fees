@@ -1,6 +1,8 @@
 import logging
 import os
-from flask import Flask, jsonify, request
+import tarfile
+import tempfile
+from flask import Flask, jsonify, request, Response, send_file
 from flask_compress import Compress
 from flask_cors import CORS
 from flask_limiter import Limiter
@@ -142,6 +144,61 @@ def create_app():
         except Exception as e:
             logger.error(f"/blockcount RPC failed: {e}", exc_info=True)
             return jsonify({"error": "Internal server error"}), 500
+
+    # ---------------------------------------------------------------------------
+    # Data snapshot — download all chain databases as a tar.gz
+    # ---------------------------------------------------------------------------
+
+    @app.route("/data/snapshot", methods=['GET'])
+    @limiter.limit("2 per hour")
+    def data_snapshot():
+        """Serve a tar.gz of all chain fee_analysis.db files.
+
+        Writes the archive to a temp file first so it streams from disk
+        instead of buffering gigabytes of data in RAM.  The temp file is
+        cleaned up automatically after the response is sent.
+        """
+        tmp = tempfile.NamedTemporaryFile(suffix=".tar.gz", delete=False)
+        tmp_path = tmp.name
+        try:
+            with tarfile.open(fileobj=tmp, mode="w:gz") as tar:
+                for chain in rpc_service.registry.chains():
+                    db_path = os.path.realpath(db_service.get_db_path(chain))
+                    # Only serve files that actually exist and live inside
+                    # the expected DB directory (path traversal guard).
+                    if not os.path.isfile(db_path) or not db_path.startswith(
+                        os.path.realpath(db_service._BASE_DB_DIR)
+                    ):
+                        continue
+                    subdir = db_service.CHAIN_DIR_MAP.get(chain, chain)
+                    arcname = os.path.join(subdir, db_service.DB_FILENAME) if subdir else db_service.DB_FILENAME
+                    tar.add(db_path, arcname=arcname)
+            tmp.close()
+
+            response = send_file(
+                tmp_path,
+                mimetype="application/gzip",
+                as_attachment=True,
+                download_name="fee_data.tar.gz",
+            )
+            response.headers["Cache-Control"] = "public, max-age=3600"
+
+            @response.call_on_close
+            def _cleanup():
+                try:
+                    os.unlink(tmp_path)
+                except OSError:
+                    pass
+
+            return response
+        except Exception:
+            # Clean up temp file on error
+            tmp.close()
+            try:
+                os.unlink(tmp_path)
+            except OSError:
+                pass
+            raise
 
     # ---------------------------------------------------------------------------
     # Error handlers
