@@ -54,17 +54,22 @@ def _run_collector_for_chain(chain: str):
         time.sleep(sleep_time)
 
 
-def start_background_collectors():
+def start_background_collectors() -> bool:
     """Spawn one collector thread per registered chain.
 
     With multi-worker servers (e.g. gunicorn --workers 4) each worker process
     calls this function.  A file lock ensures only one process actually starts
     the collector threads — the rest silently skip.
+
+    Returns True if this worker acquired the lock and started the collectors
+    (i.e. it is the primary worker), False otherwise.  Callers use this to run
+    other single-worker-only work (e.g. the data snapshot build) on the same
+    process instead of racing across all workers.
     """
     global _collectors_started, _lock_fd
     if _collectors_started:
         logger.warning("Collectors already running, skipping.")
-        return
+        return False
 
     lock_path = db_service.get_db_path("main") + ".collector.lock"
     os.makedirs(os.path.dirname(lock_path), exist_ok=True)
@@ -75,7 +80,7 @@ def start_background_collectors():
         logger.info("Another worker owns the collector lock — skipping.")
         _lock_fd.close()
         _lock_fd = None
-        return
+        return False
 
     _collectors_started = True
 
@@ -84,4 +89,6 @@ def start_background_collectors():
         thread = threading.Thread(target=_run_collector_for_chain, args=(chain,), daemon=True)
         thread.start()
         logger.info(f"Collector thread started for {chain}")
+
+    return True
 
