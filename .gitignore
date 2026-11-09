@@ -234,5 +234,7 @@ fee_analysis.db
 fee_analysis.db-shm
 fee_analysis.db-wal
 fee_analysis.db.collector.lock
+fee_data.tar.gz
+fee_data.tar.gz.tmp
 
 .DS_Store
