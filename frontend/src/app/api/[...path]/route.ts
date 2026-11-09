@@ -12,6 +12,7 @@ const ALLOWED_PATH_ROOTS = new Set([
   "performance-data",
   "fees-sum",
   "networks",
+  "data",
 ]);
 
 export async function GET(
@@ -51,6 +52,20 @@ export async function GET(
         { error: "Backend request failed" },
         { status: response.status }
       );
+    }
+
+    // Binary responses (e.g. /data/snapshot tar.gz) — stream the body
+    // through without buffering in memory (databases can be multiple GB).
+    const contentType = response.headers.get("content-type") || "";
+    if (!contentType.includes("application/json")) {
+      return new NextResponse(response.body, {
+        status: response.status,
+        headers: {
+          "Content-Type": contentType,
+          "Content-Disposition": response.headers.get("content-disposition") || "",
+          "Cache-Control": response.headers.get("cache-control") || "public, max-age=3600",
+        },
+      });
     }
 
     const data = await response.json();

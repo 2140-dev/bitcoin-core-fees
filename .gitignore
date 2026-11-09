@@ -231,5 +231,8 @@ __marimo__/
 # Streamlit
 .streamlit/secrets.toml
 fee_analysis.db
+fee_analysis.db-shm
+fee_analysis.db-wal
+fee_analysis.db.collector.lock
 
 .DS_Store
