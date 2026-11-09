@@ -1,7 +1,6 @@
 ### Bitcoin Core Fee Rate Estimator
 
-- A full-stack application for monitoring and validating Bitcoin Core transaction fee estimates against actual block data.
-- Built on top of Bitcoin Core PR #34075
+A full-stack application for monitoring and validating Bitcoin Core transaction fee estimates against actual block data.
 
 ### Overview
 
@@ -28,22 +27,32 @@ This project tracks `estimatesmartfee` from a Bitcoin Core node and compares tho
 │   └── tests/          # Pytest suite for backend validation
 ├── frontend/           # Next.js web application
 │   ├── src/app/        # App router and pages
-│   └── src/components/ # D3 and Recharts visualization components
+│   └── src/components/ # D3 visualization components
 ├── scripts/            # Helper scripts (data import, etc.)
 └── .github/workflows/  # Automated testing workflow
 ```
 
-#### How to Use
+---
+
+### Getting Started
 
 #### Prerequisites
 - **Bitcoin Core Node**: Access to a node with RPC enabled (`getblockstats` support required).
 - **Python**: 3.12+
 - **Node.js**: 22+
 
-#### 1. Configuration
-- **Backend**: Copy `backend/rpc_config.ini.example` to `backend/rpc_config.ini` and add one `[RPC.<chain>]` section per node you want to connect to. Each section needs `URL`, `RPC_USER`, and `RPC_PASSWORD`. The chain is auto-detected via `getblockchaininfo`. Estimates are stored in per-network databases (`fee_analysis.db`, `testnet3/fee_analysis.db`, etc.).
+#### Configuration
+Copy `backend/rpc_config.ini.example` to `backend/rpc_config.ini` and add one `[RPC.<chain>]` section per node you want to connect to. Each section needs `URL`, `RPC_USER`, and `RPC_PASSWORD`. The chain is auto-detected via `getblockchaininfo`.
 
-#### 2. Manual Startup
+#### Quick Start
+```bash
+chmod +x restart.sh
+./restart.sh
+```
+
+<details>
+<summary>Manual startup</summary>
+
 **Backend:**
 ```bash
 cd backend
@@ -59,27 +68,34 @@ cd frontend
 npm install
 npm run dev
 ```
+</details>
 
-#### 3. Automated Startup
-Use the provided `restart.sh` script to launch both services in the background:
+#### Pre-collected Data
+
+To bootstrap with historical fee data instead of collecting from scratch:
+
 ```bash
-chmod +x restart.sh
-./restart.sh
+./scripts/import-data.sh
 ```
+
+Or manually:
+
+```bash
+curl -fSL https://bitcoincorefeerate.com/api/data/snapshot | tar xzf - -C backend/src/services/
+```
+
+The backend picks up the databases on next start — no extra configuration needed.
 
 ---
 
 ### REST API
 
-All endpoints are served by the Flask backend (default port `5001`) and proxied through the Next.js frontend at `/api/*`. Every endpoint accepts an optional `?chain=<chain>` query parameter to target a specific connected node. Omitting it uses the first configured node.
+All endpoints are served by the Flask backend (default port `5001`) and proxied through the Next.js frontend at `/api/*`. Every endpoint accepts an optional `?chain=<chain>` query parameter. Omitting it uses the first configured node.
 
-Available chain values: `main`, `test`, `testnet4`, `signet`, `regtest`.
+Available chains: `main`, `test`, `testnet4`, `signet`, `regtest`.
 
----
-
-#### `GET /networks`
-
-Returns all connected Bitcoin Core nodes.
+<details>
+<summary><code>GET /networks</code> — List connected nodes</summary>
 
 ```
 GET /networks
@@ -91,22 +107,20 @@ GET /networks
   { "chain": "signet", "chain_display": "SIGNET"  }
 ]
 ```
+</details>
 
----
-
-#### `GET /fees/<target>/<mode>/<level>`
-
-Returns a fee rate estimate from Bitcoin Core's `estimatesmartfee`.
+<details>
+<summary><code>GET /fees/&lt;target&gt;/&lt;mode&gt;/&lt;level&gt;</code> — Fee rate estimate</summary>
 
 | Parameter | Type   | Description |
 |-----------|--------|-------------|
 | `target`  | int    | Confirmation target in blocks (e.g. `2`, `7`, `144`) |
 | `mode`    | string | `economical`, `conservative`, or `unset` |
-| `level`   | int    | Verbosity level passed to `estimatesmartfee` (PR #34075) |
+| `level`   | int    | Verbosity level passed to `estimatesmartfee` |
 
 | Query param          | Default | Description |
 |----------------------|---------|-------------|
-| `block_policy_only`  | `false` | When `true`, restricts estimation to the block policy estimator only. When `false`, Bitcoin Core may use additional estimators and includes an `estimator` field in the response naming the one chosen. |
+| `block_policy_only`  | `false` | When `true`, restricts to block policy estimator only |
 
 ```
 GET /fees/2/economical/2?chain=signet
@@ -121,12 +135,12 @@ GET /fees/2/economical/2?chain=signet
   "chain": "signet"
 }
 ```
+</details>
 
----
+<details>
+<summary><code>GET /mempool-health</code> — Per-block mempool health</summary>
 
-#### `GET /mempool-health`
-
-Returns per-block mempool health statistics sourced from `estimatesmartfee` verbosity 2 (PR #34075). Each entry shows how much of a recent block's weight came from mempool transactions.
+Returns how much of each recent block's weight came from mempool transactions (`ratio` = `mempool_txs_weight / block_weight`, capped at `1.0`).
 
 ```
 GET /mempool-health?chain=main
@@ -142,14 +156,12 @@ GET /mempool-health?chain=main
   }
 ]
 ```
+</details>
 
-`ratio` = `mempool_txs_weight / block_weight`, capped at `1.0`.
+<details>
+<summary><code>GET /mempool-diagram</code> — Mempool fee/weight curve</summary>
 
----
-
-#### `GET /mempool-diagram`
-
-Returns the current mempool fee/weight accumulation curve from `getmempoolfeeratediagram`, plus feerate percentiles for 1-, 2-, and 3-block windows.
+Returns the accumulation curve from `getmempoolfeeratediagram` plus feerate percentiles for 1-, 2-, and 3-block windows.
 
 ```
 GET /mempool-diagram?chain=main
@@ -160,20 +172,18 @@ GET /mempool-diagram?chain=main
   "raw": [{ "weight": 4000000, "fee": 0.004 }],
   "windows": {
     "1":   { "5": 1.2, "25": 3.4, "50": 5.1, "75": 8.0, "95": 20.0 },
-    "2":   { ... },
-    "3":   { ... },
-    "all": { ... }
+    "2":   { "..." : "..." },
+    "3":   { "..." : "..." },
+    "all": { "..." : "..." }
   },
   "total_weight": 141480000,
   "total_fee": 1.42
 }
 ```
+</details>
 
----
-
-#### `GET /blockcount`
-
-Returns the current block height and chain info.
+<details>
+<summary><code>GET /blockcount</code> — Current block height</summary>
 
 ```
 GET /blockcount?chain=main
@@ -186,12 +196,10 @@ GET /blockcount?chain=main
   "chain_display": "MAINNET"
 }
 ```
+</details>
 
----
-
-#### `GET /performance-data/<start_block>/`
-
-Returns historical fee estimates from the database alongside actual block feerate percentiles, for evaluating estimate accuracy.
+<details>
+<summary><code>GET /performance-data/&lt;start_block&gt;/</code> — Historical estimate accuracy</summary>
 
 | Query param | Default | Description |
 |-------------|---------|-------------|
@@ -208,12 +216,10 @@ GET /performance-data/945000/?target=2&count=100&chain=main
   "estimates": [{ "height": 945000, "rate": 3.1 }]
 }
 ```
+</details>
 
----
-
-#### `GET /fees-sum/<start_block>/`
-
-Returns an accuracy summary for fee estimates starting from `start_block`, comparing stored estimates against actual block feerate percentiles.
+<details>
+<summary><code>GET /fees-sum/&lt;start_block&gt;/</code> — Accuracy summary</summary>
 
 | Query param | Default | Description |
 |-------------|---------|-------------|
@@ -231,41 +237,24 @@ GET /fees-sum/944000/?target=2&chain=main
   "underpayment_val": 25, "underpayment_perc": 0.026
 }
 ```
+</details>
 
----
+<details>
+<summary><code>GET /data/snapshot</code> — Download collected data</summary>
 
-#### `GET /data/snapshot`
-
-Downloads all collected fee estimation databases as a single `tar.gz` archive. Rate-limited to 2 requests per hour.
+Downloads all chain databases as a single `tar.gz` (~890 MB). Rate-limited to 2 requests per hour.
 
 ```
 GET /data/snapshot
 ```
 
-Returns a `fee_data.tar.gz` containing:
+Archive contents:
 ```
 fee_analysis.db            # mainnet
 signet/fee_analysis.db     # signet
 testnet4/fee_analysis.db   # testnet4
 ```
-
----
-
-### Pre-collected Data
-
-To bootstrap a new server with historical fee data instead of collecting from scratch, download the snapshot from a running instance:
-
-```bash
-./scripts/import-data.sh
-```
-
-Or manually:
-
-```bash
-curl -fSL https://bitcoincorefeerate.com/api/data/snapshot | tar xzf - -C backend/src/services/
-```
-
-This extracts the databases into the correct locations. The backend picks them up on next start — no extra configuration needed.
+</details>
 
 ---
 
