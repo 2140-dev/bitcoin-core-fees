@@ -3,7 +3,6 @@
 import { useState } from "react";
 import { BarChart3, TrendingUp, AlertCircle, CheckCircle2, Database, ArrowRight, RefreshCw } from "lucide-react";
 import { useStats } from "../../hooks/useStats";
-import { Header } from "../../components/common/Header";
 import { useNetwork } from "../../context/NetworkContext";
 import FeeHistoryChart from "../../components/stats/FeeHistoryChart";
 import SummaryCard from "../../components/stats/SummaryCard";
@@ -49,9 +48,6 @@ export default function StatsPage() {
   const hasBlocks = blocks && blocks.length > 0;
 
   return (
-    <div className="min-h-screen bg-[var(--background)] text-[var(--foreground)] selection:bg-orange-500/30 font-sans">
-      <Header />
-
       <main className="max-w-7xl mx-auto px-4 py-8 md:py-12">
         {/* Sleek Control Bar */}
         <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-10 gap-6">
@@ -196,6 +192,5 @@ export default function StatsPage() {
           </div>
         </div>
       </main>
-    </div>
   );
 }

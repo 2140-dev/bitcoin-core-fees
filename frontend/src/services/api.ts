@@ -14,7 +14,6 @@ export class BitcoinCoreAPI {
   private baseUrl: string;
   constructor(baseUrl?: string) {
     this.baseUrl = baseUrl ?? API_BASE_PATH;
-    console.debug(`[API Service] Using relative proxy path: ${this.baseUrl}`);
   }
 
   private async fetchJson<T>(path: string, options?: RequestInit): Promise<T> {

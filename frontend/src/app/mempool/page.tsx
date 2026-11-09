@@ -3,7 +3,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { api } from "../../services/api";
 import { MempoolDiagramResponse } from "../../types/api";
-import { Header } from "../../components/common/Header";
 import { useNetwork } from "../../context/NetworkContext";
 import MempoolDiagramChart from "../../components/mempool/MempoolDiagramChart";
 import { AlertCircle, RefreshCw, Database as DbIcon } from "lucide-react";
@@ -56,9 +55,6 @@ export default function MempoolPage() {
   const totalFee = data?.total_fee || 0;
 
   return (
-    <div className="min-h-screen bg-[var(--background)] text-[var(--foreground)] selection:bg-orange-500/30 font-sans">
-      <Header />
-
       <main className="max-w-7xl mx-auto px-4 py-8 md:py-12">
         {/* Sleek Header Bar with Total Stats */}
         <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-8 gap-6">
@@ -111,7 +107,7 @@ export default function MempoolPage() {
         )}
 
         {/* Hero Section: Windowed Percentiles */}
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-10">
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4 mb-10">
           {["5", "25", "50", "75", "95"].map((p) => (
             <div key={p} className="bg-[var(--card)] p-6 rounded-3xl border border-[var(--card-border)] shadow-sm text-left group hover:border-orange-500/30 transition-all">
               <h3 className="text-[var(--muted)] text-[9px] font-semibold uppercase tracking-wider mb-1">p{p} feerate</h3>
@@ -164,6 +160,5 @@ export default function MempoolPage() {
           </div>
         </div>
       </main>
-    </div>
   );
 }

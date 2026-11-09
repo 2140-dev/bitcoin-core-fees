@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useRef, useCallback } from "react";
 import * as d3 from "d3";
 import { MempoolDiagramPoint } from "../../types/api";
 
@@ -15,7 +15,7 @@ export default function MempoolDiagramChart({ data, percentiles, blocksToShow, l
   const svgRef = useRef<SVGSVGElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
+  const draw = useCallback(() => {
     if (!svgRef.current || !containerRef.current || loading || data.length === 0) return;
 
     // Read theme tokens so the chart adapts to light/dark mode.
@@ -52,7 +52,7 @@ export default function MempoolDiagramChart({ data, percentiles, blocksToShow, l
     const BLOCK_WEIGHT = 4000000;
     const maxDataWeight = data[data.length - 1].weight;
     const currentMaxWeight = blocksToShow === "all" ? maxDataWeight : blocksToShow * BLOCK_WEIGHT;
-    
+
     const filteredData = plotData.filter(d => d.weight <= currentMaxWeight);
 
     const x = d3.scaleLinear().domain([0, currentMaxWeight]).range([0, width]);
@@ -81,12 +81,8 @@ export default function MempoolDiagramChart({ data, percentiles, blocksToShow, l
     svg.append("path").datum(filteredData).attr("fill", "none").attr("stroke", C.accent).attr("stroke-width", 3).attr("d", line);
 
     // --- Global Window Percentiles ---
-    // Collect anchor positions first so we can spread labels that stack up
-    // when the curve is nearly flat (low-fee / testnet scenario).
     type LabelDatum = { posX: number; posY: number; perc: string; rate: number };
     const labelData: LabelDatum[] = Object.entries(percentiles).map(([perc, rate]) => {
-      // perc is the feerate percentile label (e.g. 95 = top 5% by feerate).
-      // The actual weight position is the complement: (1 - perc/100).
       const weightFraction = 1 - Number(perc) / 100;
       const targetW = weightFraction * currentMaxWeight;
       const bisect = d3.bisector((d: any) => d.weight).left;
@@ -103,15 +99,10 @@ export default function MempoolDiagramChart({ data, percentiles, blocksToShow, l
       return { posX: x(targetW), posY: y(targetFee), perc, rate };
     }).sort((a, b) => a.posX - b.posX);
 
-    // Each label block = feerate (10px) + percentile (8px) stacked above the dot.
-    // BLOCK_H: total height of one label block (both lines + inner gap).
-    // MIN_GAP: minimum space between the bottom of one block and top of the next.
     const BLOCK_H = 26;
     const MIN_GAP = 6;
-    const SLOT = BLOCK_H + MIN_GAP; // 32px per slot
+    const SLOT = BLOCK_H + MIN_GAP;
 
-    // `labelY[i]` = y of the TOP of label block i (feerate line).
-    // Start each block 8px above its dot so the block sits entirely above the curve.
     const labelY = labelData.map(d => d.posY - BLOCK_H - 8);
 
     // Forward pass: push blocks down so no block overlaps the one above.
@@ -120,15 +111,14 @@ export default function MempoolDiagramChart({ data, percentiles, blocksToShow, l
         labelY[i] = labelY[i - 1] + SLOT;
       }
     }
-    // Backward pass: if the last block spills below the chart, pull it up
-    // and cascade upward to maintain gaps.
+    // Backward pass: if the last block spills below the chart, pull it up.
     labelY[labelY.length - 1] = Math.min(labelY[labelY.length - 1], height - BLOCK_H - 4);
     for (let i = labelY.length - 2; i >= 0; i--) {
       if (labelY[i + 1] - labelY[i] < SLOT) {
         labelY[i] = labelY[i + 1] - SLOT;
       }
     }
-    // Clamp first block to chart top, then forward-pass once more to re-enforce gaps.
+    // Clamp first block to chart top, then forward-pass once more.
     labelY[0] = Math.max(labelY[0], 4);
     for (let i = 1; i < labelY.length; i++) {
       if (labelY[i] < labelY[i - 1] + SLOT) {
@@ -141,11 +131,9 @@ export default function MempoolDiagramChart({ data, percentiles, blocksToShow, l
       const blockBottom = blockTop + BLOCK_H;
       const leaderNeeded = posY > blockBottom + 4;
 
-      // Dot on the curve.
       svg.append("circle").attr("cx", posX).attr("cy", posY).attr("r", 4)
         .attr("fill", C.fg).attr("stroke", C.chartBg).attr("stroke-width", 1.5);
 
-      // Leader line from dot up to bottom of label block.
       if (leaderNeeded) {
         svg.append("line")
           .attr("x1", posX).attr("y1", posY - 6)
@@ -153,12 +141,10 @@ export default function MempoolDiagramChart({ data, percentiles, blocksToShow, l
           .attr("stroke", C.axis).attr("stroke-width", 1).attr("stroke-dasharray", "2,2");
       }
 
-      // Feerate label at top of block.
       svg.append("text").attr("x", posX).attr("y", blockTop + 10)
         .attr("text-anchor", "middle").style("font-size", "10px").style("font-weight", "600")
         .attr("fill", C.fg).text(`${rate.toFixed(1)}`);
 
-      // Percentile label at bottom of block.
       svg.append("text").attr("x", posX).attr("y", blockTop + BLOCK_H)
         .attr("text-anchor", "middle").style("font-size", "8px").style("font-weight", "500")
         .attr("fill", C.muted).text(`p${perc}`);
@@ -195,6 +181,19 @@ export default function MempoolDiagramChart({ data, percentiles, blocksToShow, l
       .text("CUMULATIVE FEE (BTC)");
 
   }, [data, percentiles, blocksToShow, loading]);
+
+  // Draw on data change and resize
+  useEffect(() => {
+    draw();
+
+    const container = containerRef.current;
+    if (!container) return;
+
+    const ro = new ResizeObserver(() => draw());
+    ro.observe(container);
+
+    return () => ro.disconnect();
+  }, [draw]);
 
   return (
     <div ref={containerRef} className="w-full h-full min-h-[500px] relative">

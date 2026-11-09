@@ -54,7 +54,14 @@ export async function GET(
     }
 
     const data = await response.json();
-    return NextResponse.json(data);
+
+    // Allow browsers to reuse responses briefly, reducing redundant fetches
+    // during rapid UI interactions (target switches, scale toggles, etc.).
+    // stale-while-revalidate lets the browser serve a cached response
+    // immediately while fetching a fresh one in the background.
+    const res = NextResponse.json(data);
+    res.headers.set("Cache-Control", "public, max-age=5, stale-while-revalidate=25");
+    return res;
   } catch (error) {
     console.error(`[Proxy] Failed to reach backend for ${pathStr}:`, error);
     return NextResponse.json(
