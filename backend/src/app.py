@@ -1,8 +1,9 @@
 import logging
 import os
 import tarfile
-import tempfile
-from flask import Flask, jsonify, request, Response, send_file
+import threading
+import time
+from flask import Flask, jsonify, request, send_file
 from flask_compress import Compress
 from flask_cors import CORS
 from flask_limiter import Limiter
@@ -149,56 +150,53 @@ def create_app():
     # Data snapshot — download all chain databases as a tar.gz
     # ---------------------------------------------------------------------------
 
-    @app.route("/data/snapshot", methods=['GET'])
-    @limiter.limit("2 per hour")
-    def data_snapshot():
-        """Serve a tar.gz of all chain fee_analysis.db files.
+    _SNAPSHOT_PATH = os.path.join(db_service._BASE_DB_DIR, "fee_data.tar.gz")
+    _SNAPSHOT_LOCK = threading.Lock()
 
-        Writes the archive to a temp file first so it streams from disk
-        instead of buffering gigabytes of data in RAM.  The temp file is
-        cleaned up automatically after the response is sent.
-        """
-        tmp = tempfile.NamedTemporaryFile(suffix=".tar.gz", delete=False)
-        tmp_path = tmp.name
+    def _rebuild_snapshot():
+        """Compress all chain databases into a single tar.gz on disk."""
+        tmp_path = _SNAPSHOT_PATH + ".tmp"
+        base = os.path.realpath(db_service._BASE_DB_DIR)
         try:
-            with tarfile.open(fileobj=tmp, mode="w:gz") as tar:
+            with tarfile.open(tmp_path, mode="w:gz") as tar:
                 for chain in rpc_service.registry.chains():
                     db_path = os.path.realpath(db_service.get_db_path(chain))
-                    # Only serve files that actually exist and live inside
-                    # the expected DB directory (path traversal guard).
-                    if not os.path.isfile(db_path) or not db_path.startswith(
-                        os.path.realpath(db_service._BASE_DB_DIR)
-                    ):
+                    if not os.path.isfile(db_path) or not db_path.startswith(base):
                         continue
                     subdir = db_service.CHAIN_DIR_MAP.get(chain, chain)
                     arcname = os.path.join(subdir, db_service.DB_FILENAME) if subdir else db_service.DB_FILENAME
                     tar.add(db_path, arcname=arcname)
-            tmp.close()
-
-            response = send_file(
-                tmp_path,
-                mimetype="application/gzip",
-                as_attachment=True,
-                download_name="fee_data.tar.gz",
-            )
-            response.headers["Cache-Control"] = "public, max-age=3600"
-
-            @response.call_on_close
-            def _cleanup():
-                try:
-                    os.unlink(tmp_path)
-                except OSError:
-                    pass
-
-            return response
+            os.replace(tmp_path, _SNAPSHOT_PATH)
+            logger.info("Data snapshot rebuilt: %s", _SNAPSHOT_PATH)
         except Exception:
-            # Clean up temp file on error
-            tmp.close()
+            logger.exception("Failed to rebuild data snapshot")
             try:
                 os.unlink(tmp_path)
             except OSError:
                 pass
-            raise
+
+    def _snapshot_loop():
+        """Rebuild the snapshot every 6 hours."""
+        while True:
+            with _SNAPSHOT_LOCK:
+                _rebuild_snapshot()
+            time.sleep(6 * 3600)
+
+    _rebuild_snapshot()
+    threading.Thread(target=_snapshot_loop, daemon=True).start()
+
+    @app.route("/data/snapshot", methods=['GET'])
+    @limiter.limit("2 per hour")
+    def data_snapshot():
+        """Serve the pre-built tar.gz of all chain fee_analysis.db files."""
+        if not os.path.isfile(_SNAPSHOT_PATH):
+            return jsonify({"error": "Snapshot not yet available, try again shortly"}), 503
+        return send_file(
+            _SNAPSHOT_PATH,
+            mimetype="application/gzip",
+            as_attachment=True,
+            download_name="fee_data.tar.gz",
+        )
 
     # ---------------------------------------------------------------------------
     # Error handlers
