@@ -105,5 +105,6 @@ def calculate_local_summary(
     target: int = 2,
     start_height: Optional[int] = None,
     chain: Optional[str] = None,
+    all_time: bool = False,
 ) -> Dict[str, Any]:
-    return get_client(chain).calculate_local_summary(target, start_height)
+    return get_client(chain).calculate_local_summary(target, start_height, all_time)

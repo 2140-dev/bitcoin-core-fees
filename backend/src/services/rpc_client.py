@@ -248,6 +248,52 @@ class RpcClient:
 
         return results
 
+    # Blocks within this many of the tip aren't persisted to the block_stats
+    # cache — a reorg could still change their feerate_percentiles.
+    _REORG_BUFFER = 6
+
+    def _block_ranges(self, heights: List[int], tip_height: Optional[int] = None, persist: bool = False) -> Dict[int, tuple]:
+        """Return {height: (p10, p90)} for the given heights.
+
+        Reads from the persistent block_stats cache first; any misses are
+        fetched via getblockstats (in parallel). Misses buried deeper than
+        _REORG_BUFFER below the tip are written back *only* when persist=True.
+
+        To keep SQLite writes single-writer (the app's design — only the
+        background job and collector write), persist=True is used solely by the
+        primary worker's all-time summary job. Request paths read the cache and
+        fetch misses live without writing, so concurrent API traffic across
+        workers never writes to the DB.
+        """
+        import services.database_service as db_service
+
+        heights = list(heights)
+        if not heights:
+            return {}
+
+        ranges = db_service.get_block_ranges(self.chain, heights)
+        missing = [h for h in heights if h not in ranges]
+        if not missing:
+            return ranges
+
+        if tip_height is None:
+            try:
+                tip_height = self.get_block_count()
+            except Exception:
+                tip_height = None
+
+        fetched = self._fetch_block_stats_parallel(missing)
+        to_store: Dict[int, tuple] = {}
+        for h, stats in fetched.items():
+            p = stats.get("feerate_percentiles", [0, 0, 0, 0, 0])
+            rng = (p[0], p[4])
+            ranges[h] = rng
+            if persist and (tip_height is None or h <= tip_height - self._REORG_BUFFER):
+                to_store[h] = rng
+        if persist:
+            db_service.save_block_ranges(self.chain, to_store)
+        return ranges
+
     # ------------------------------------------------------------------
     # Mempool feerate diagram
     # ------------------------------------------------------------------
@@ -345,19 +391,19 @@ class RpcClient:
         block_policy_estimates = [{"height": h, "rate": latest_bp_map[h]} for h in sorted(latest_bp_map)]
 
         heights = list(range(start_height, start_height + count))
-        block_stats = self._fetch_block_stats_parallel(heights)
+        ranges = self._block_ranges(heights)
 
         blocks = []
         for h in heights:
-            stats = block_stats.get(h)
-            if stats is None:
+            rng = ranges.get(h)
+            if rng is None:
                 continue
-            p = stats.get("feerate_percentiles", [0, 0, 0, 0, 0])
-            blocks.append({"height": h, "low": p[0], "high": p[4]})
+            low, high = rng
+            blocks.append({"height": h, "low": low, "high": high})
 
         return {"blocks": blocks, "estimates": estimates, "block_policy_estimates": block_policy_estimates}
 
-    def calculate_local_summary(self, target: int = 2, start_height: Optional[int] = None) -> Dict[str, Any]:
+    def calculate_local_summary(self, target: int = 2, start_height: Optional[int] = None, all_time: bool = False) -> Dict[str, Any]:
         """Classify stored fee estimates as within-range, overpaid, or underpaid.
 
         An estimate is:
@@ -375,9 +421,15 @@ class RpcClient:
 
         effective_target = _clamp_target(target)
         current_h = self.get_block_count()
-        start_h = start_height if start_height is not None else current_h - 1000
+        if all_time:
+            # Full history: start at the earliest recorded estimate, bypassing
+            # the per-request range cap (only the background job calls this).
+            height_range = db_service.get_db_height_range(effective_target, chain=self.chain)
+            start_h = height_range[0] if height_range and height_range[0] is not None else current_h - 1000
+        else:
+            start_h = start_height if start_height is not None else current_h - 1000
         db_rows = db_service.get_estimates_in_range(
-            start_h, current_h, effective_target, chain=self.chain,
+            start_h, current_h, effective_target, chain=self.chain, enforce_cap=not all_time,
         )
 
         valid_rows = []
@@ -389,7 +441,9 @@ class RpcClient:
             valid_rows.append(row)
             needed_heights.update(range(row["poll_height"] + 1, window_end + 1))
 
-        self._fetch_block_stats_parallel(list(needed_heights))
+        # Persist to the block_stats cache only from the background all-time job
+        # (single-writer); the live /fees-sum range path reads/fetches without writing.
+        ranges = self._block_ranges(sorted(needed_heights), tip_height=current_h, persist=all_time)
 
         total = over = under = within = 0
 
@@ -404,15 +458,14 @@ class RpcClient:
             total += 1
 
             for h in range(poll_h + 1, window_end + 1):
-                try:
-                    b = self.get_single_block_stats(h)
-                    p = b.get("feerate_percentiles", [0, 0, 0, 0, 0])
-                    if est >= p[0]:
-                        is_under = False
-                    if est > p[4]:
-                        is_over = True
-                except Exception:
-                    logger.debug("Skipping block %d in summary calculation — RPC unavailable", h)
+                rng = ranges.get(h)
+                if rng is None:
+                    continue
+                low, high = rng
+                if est >= low:
+                    is_under = False
+                if est > high:
+                    is_over = True
 
             if is_under:
                 under += 1
