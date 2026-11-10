@@ -23,8 +23,13 @@ source .venv/bin/activate
 pip install -r requirements.txt
 
 # Production: gunicorn with multiple workers instead of raw python
-nohup env PYTHONPATH=src .venv/bin/gunicorn \
+# gthread workers: each worker handles multiple requests concurrently, so a
+# slow RPC call or a large /data/snapshot download doesn't block the whole
+# worker (sync workers handle one request at a time).
+nohup env PYTHONPATH=src LOG_LEVEL="${LOG_LEVEL:-INFO}" .venv/bin/gunicorn \
     --workers 4 \
+    --worker-class gthread \
+    --threads 8 \
     --bind 127.0.0.1:5001 \
     --timeout 120 \
     --access-logfile access.log \
