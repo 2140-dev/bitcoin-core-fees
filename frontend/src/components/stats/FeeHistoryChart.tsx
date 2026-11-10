@@ -260,17 +260,17 @@ export default function FeeHistoryChart({ blocks, estimates, blockPolicyEstimate
             <div class="space-y-1 text-xs">
               <div class="font-black border-b border-[var(--card-border)] pb-1 mb-1">BLOCK #${heightVal}</div>
               <div class="flex justify-between gap-4">
-                <span class="text-[var(--muted)]">Range:</span>
+                <span class="text-[var(--muted)]">p10–p90:</span>
                 <span class="font-mono font-bold">${b.low.toFixed(1)} - ${b.high.toFixed(1)}</span>
               </div>
               ${e ? `
               <div class="flex justify-between gap-4">
-                <span class="text-[#3b82f6] font-bold">Estimate:</span>
+                <span class="text-[#3b82f6] font-bold">mempool_policy:</span>
                 <span class="font-mono font-black text-[#3b82f6]">${e.rate.toFixed(2)}</span>
               </div>` : ''}
               ${bp ? `
               <div class="flex justify-between gap-4">
-                <span class="text-[#d97706] font-bold">Block policy:</span>
+                <span class="text-[#d97706] font-bold">block_policy:</span>
                 <span class="font-mono font-black text-[#d97706]">${bp.rate.toFixed(2)}</span>
               </div>` : ''}
             </div>

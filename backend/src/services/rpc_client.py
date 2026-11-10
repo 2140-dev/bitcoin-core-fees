@@ -377,22 +377,28 @@ class RpcClient:
         import services.database_service as db_service
 
         effective_target = _clamp_target(target)
-        db_rows = db_service.get_estimates_in_range(
-            start_height, start_height + count, effective_target, chain=self.chain,
-        )
-        bp_rows = db_service.get_estimates_in_range(
-            start_height, start_height + count, effective_target, chain=self.chain, block_policy_only=True,
-        )
+        end_height = start_height + count
 
-        latest_estimates_map = {row["poll_height"]: row["estimate_feerate"] for row in db_rows}
-        estimates = [{"height": h, "rate": latest_estimates_map[h]} for h in sorted(latest_estimates_map)]
+        # One line per (estimator x mode). block_policy_only False = the auto
+        # estimator (mempool_policy on this build); True = legacy block_policy.
+        series_defs = [
+            ("mempool_policy_economical", False, "economical", "mempool_policy"),
+            ("block_policy_economical", True, "economical", "block_policy"),
+            ("mempool_policy_conservative", False, "conservative", "mempool_policy"),
+            ("block_policy_conservative", True, "conservative", "block_policy"),
+        ]
+        series = []
+        for key, block_policy_only, mode, estimator in series_defs:
+            rows = db_service.get_estimates_in_range(
+                start_height, end_height, effective_target, chain=self.chain,
+                block_policy_only=block_policy_only, mode=mode,
+            )
+            rate_map = {row["poll_height"]: row["estimate_feerate"] for row in rows}
+            points = [{"height": h, "rate": rate_map[h]} for h in sorted(rate_map)]
+            series.append({"key": key, "estimator": estimator, "mode": mode, "points": points})
 
-        latest_bp_map = {row["poll_height"]: row["estimate_feerate"] for row in bp_rows}
-        block_policy_estimates = [{"height": h, "rate": latest_bp_map[h]} for h in sorted(latest_bp_map)]
-
-        heights = list(range(start_height, start_height + count))
+        heights = list(range(start_height, end_height))
         ranges = self._block_ranges(heights)
-
         blocks = []
         for h in heights:
             rng = ranges.get(h)
@@ -401,9 +407,16 @@ class RpcClient:
             low, high = rng
             blocks.append({"height": h, "low": low, "high": high})
 
-        return {"blocks": blocks, "estimates": estimates, "block_policy_estimates": block_policy_estimates}
+        # Back-compat keys (economical series) kept alongside the full `series`.
+        by_key = {s["key"]: s["points"] for s in series}
+        return {
+            "blocks": blocks,
+            "series": series,
+            "estimates": by_key["mempool_policy_economical"],
+            "block_policy_estimates": by_key["block_policy_economical"],
+        }
 
-    def calculate_local_summary(self, target: int = 2, start_height: Optional[int] = None, all_time: bool = False) -> Dict[str, Any]:
+    def calculate_local_summary(self, target: int = 2, start_height: Optional[int] = None, all_time: bool = False, mode: str = "economical", block_policy_only: bool = False) -> Dict[str, Any]:
         """Classify stored fee estimates as within-range, overpaid, or underpaid.
 
         An estimate is:
@@ -422,14 +435,18 @@ class RpcClient:
         effective_target = _clamp_target(target)
         current_h = self.get_block_count()
         if all_time:
-            # Full history: start at the earliest recorded estimate, bypassing
-            # the per-request range cap (only the background job calls this).
-            height_range = db_service.get_db_height_range(effective_target, chain=self.chain)
+            # Full history: start at the earliest recorded estimate for this
+            # mode/estimator, bypassing the per-request range cap (only the
+            # background job calls this).
+            height_range = db_service.get_db_height_range(
+                effective_target, chain=self.chain, mode=mode, block_policy_only=block_policy_only,
+            )
             start_h = height_range[0] if height_range and height_range[0] is not None else current_h - 1000
         else:
             start_h = start_height if start_height is not None else current_h - 1000
         db_rows = db_service.get_estimates_in_range(
             start_h, current_h, effective_target, chain=self.chain, enforce_cap=not all_time,
+            mode=mode, block_policy_only=block_policy_only,
         )
 
         valid_rows = []
@@ -482,4 +499,5 @@ class RpcClient:
             "overpayment_perc": over / total if total > 0 else 0,
             "underpayment_val": under,
             "underpayment_perc": under / total if total > 0 else 0,
+            "first_height": start_h,
         }

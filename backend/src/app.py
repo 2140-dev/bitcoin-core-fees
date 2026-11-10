@@ -149,6 +149,11 @@ def create_app():
     def get_local_fees_sum(start_block):
         target = _clamp_int(request.args.get('target', default=2, type=int), 1, 1008)
         all_time = request.args.get("all_time", "false").lower() == "true"
+        mode = request.args.get("mode", "economical")
+        if mode not in ("economical", "conservative"):
+            mode = "economical"
+        # estimator: "block_policy" picks the legacy estimator, anything else the auto one.
+        block_policy_only = request.args.get("estimator", "auto").lower() == "block_policy"
         chain, err = _resolve_chain()
         if err:
             return err
@@ -158,10 +163,12 @@ def create_app():
             # getblockstats over ~30k blocks. Fall back to a live window only if
             # the cache hasn't been populated yet.
             if all_time:
-                cached = db_service.get_summary(chain=chain, target=max(2, target))
+                cached = db_service.get_summary(chain=chain, target=max(2, target), mode=mode, block_policy_only=block_policy_only)
                 if cached:
                     return jsonify(cached)
-            data = rpc_service.calculate_local_summary(target=target, start_height=start_block, chain=chain)
+            data = rpc_service.calculate_local_summary(
+                target=target, start_height=start_block, chain=chain, mode=mode, block_policy_only=block_policy_only,
+            )
             data["all_time"] = False
             return jsonify(data)
         except Exception as e:
@@ -238,19 +245,29 @@ def create_app():
     # per (chain, target); /fees-sum?all_time=true reads that cached row.
 
     def _refresh_all_time_summaries():
+        # One cached summary per (chain, target, mode, estimator).
         for chain in rpc_service.registry.chains():
             for target in _SUMMARY_TARGETS:
-                try:
-                    result = rpc_service.calculate_local_summary(
-                        target=target, all_time=True, chain=chain,
-                    )
-                    db_service.save_summary(chain=chain, target=target, result=result)
-                    logger.info(
-                        "All-time summary refreshed: chain=%s target=%d total=%d",
-                        chain, target, result.get("total", 0),
-                    )
-                except Exception:
-                    logger.exception("Failed to refresh all-time summary (chain=%s target=%d)", chain, target)
+                for mode in ("economical", "conservative"):
+                    for block_policy_only in (False, True):
+                        try:
+                            result = rpc_service.calculate_local_summary(
+                                target=target, all_time=True, chain=chain,
+                                mode=mode, block_policy_only=block_policy_only,
+                            )
+                            db_service.save_summary(
+                                chain=chain, target=target, result=result,
+                                mode=mode, block_policy_only=block_policy_only,
+                            )
+                            logger.info(
+                                "All-time summary refreshed: chain=%s target=%d mode=%s block_policy=%s total=%d",
+                                chain, target, mode, block_policy_only, result.get("total", 0),
+                            )
+                        except Exception:
+                            logger.exception(
+                                "Failed to refresh all-time summary (chain=%s target=%d mode=%s block_policy=%s)",
+                                chain, target, mode, block_policy_only,
+                            )
 
     def _summary_loop():
         while True:

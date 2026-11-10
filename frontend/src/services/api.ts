@@ -51,8 +51,15 @@ export class BitcoinCoreAPI {
     return this.fetchJson<PerformanceData>(`performance-data/${startBlock}/?${params}`);
   }
 
-  async getFeesSum(startBlock: number, target: number = 2, chain?: string, allTime: boolean = false): Promise<AnalyticsSummary> {
-    const params = `target=${target}${allTime ? "&all_time=true" : ""}${chain ? `&chain=${chain}` : ""}`;
+  async getFeesSum(
+    startBlock: number,
+    target: number = 2,
+    chain?: string,
+    allTime: boolean = false,
+    mode: "economical" | "conservative" = "economical",
+    estimator: "auto" | "block_policy" = "auto",
+  ): Promise<AnalyticsSummary> {
+    const params = `target=${target}${allTime ? "&all_time=true" : ""}&mode=${mode}&estimator=${estimator}${chain ? `&chain=${chain}` : ""}`;
     return this.fetchJson<AnalyticsSummary>(`fees-sum/${startBlock}?${params}`);
   }
 
