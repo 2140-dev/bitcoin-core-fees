@@ -69,8 +69,17 @@ export interface PerformanceDataEstimate {
   rate: number;
 }
 
+export interface FeeSeries {
+  key: string;
+  estimator: string;
+  mode: string;
+  points: PerformanceDataEstimate[];
+}
+
 export interface PerformanceData {
   blocks: PerformanceDataBlock[];
+  /** One entry per (estimator × mode) series. */
+  series?: FeeSeries[];
   estimates: PerformanceDataEstimate[];
   block_policy_estimates: PerformanceDataEstimate[];
 }

@@ -71,8 +71,7 @@ export function usePerformance(target: number, chain?: string) {
 
   return {
     blocks: performanceData.blocks,
-    estimates: performanceData.estimates,
-    blockPolicyEstimates: performanceData.block_policy_estimates,
+    series: performanceData.series ?? [],
     loading,
     error,
     startBlock,

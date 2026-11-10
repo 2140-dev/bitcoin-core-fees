@@ -7,15 +7,27 @@ import { useNetwork } from "../../context/NetworkContext";
 import FeeHistoryChart from "../../components/stats/FeeHistoryChart";
 import TargetSelector from "../../components/stats/TargetSelector";
 import RangeControls from "../../components/stats/RangeControls";
+import { FEE_SERIES } from "../../lib/feeSeries";
 
 export default function HistoryPage() {
   const { chain } = useNetwork();
   const [target, setTarget] = useState(2);
   const [scaleType, setScaleType] = useState<"log" | "linear">("linear");
+  // Default to the two economical lines; the rest are toggled on from the legend
+  // (economical and conservative overlap closely, so showing all 4 is noisy).
+  const [visibleKeys, setVisibleKeys] = useState<Set<string>>(
+    new Set(["mempool_policy_economical", "block_policy_economical"]),
+  );
+  const toggleSeries = (key: string) =>
+    setVisibleKeys((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
   const {
     blocks,
-    estimates,
-    blockPolicyEstimates,
+    series,
     loading,
     error,
     startBlock,
@@ -89,13 +101,26 @@ export default function HistoryPage() {
               Inclusion History
             </h2>
             <p className="text-[10px] uppercase font-bold text-[var(--muted)] mt-1 tracking-widest">
-              each block&apos;s p10–p90 fee range vs. the estimate · economical (default mode)
+              each block&apos;s p10–p90 fee range vs. every estimator × mode
             </p>
           </div>
-          <div className="flex gap-4 text-[9px] font-medium uppercase tracking-wider text-[var(--muted)] bg-[var(--surface-2)] px-4 py-2 rounded-lg border border-[var(--card-border)]">
-            <div className="flex items-center gap-1.5"><div className="w-2.5 h-2.5 bg-[var(--muted)] opacity-40 rounded-sm"></div> block p10–p90</div>
-            <div className="flex items-center gap-1.5"><div className="w-2.5 h-0.5 bg-[var(--data-blue)] rounded-full"></div> mempool_policy</div>
-            <div className="flex items-center gap-1.5"><div className="w-2.5 h-0.5 rounded-full" style={{ backgroundColor: "#d97706" }}></div> block_policy</div>
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5 text-[9px] font-medium uppercase tracking-wider text-[var(--muted)]">
+            <div className="flex items-center gap-1.5 px-2 py-1.5"><div className="w-2.5 h-2.5 bg-[var(--muted)] opacity-40 rounded-sm"></div> block p10–p90</div>
+            {FEE_SERIES.map((s) => {
+              const on = visibleKeys.has(s.key);
+              return (
+                <button
+                  key={s.key}
+                  onClick={() => toggleSeries(s.key)}
+                  title={on ? "Hide series" : "Show series"}
+                  className={`flex items-center gap-1.5 px-2 py-1.5 rounded-md border transition-all ${
+                    on ? "border-[var(--card-border)] bg-[var(--surface-2)]" : "border-transparent opacity-40 hover:opacity-70"
+                  }`}
+                >
+                  <div className="w-2.5 h-0.5 rounded-full" style={{ backgroundColor: s.color }}></div> {s.label}
+                </button>
+              );
+            })}
           </div>
         </div>
 
@@ -106,7 +131,7 @@ export default function HistoryPage() {
               <p className="text-[var(--muted)] text-[10px] font-mono uppercase tracking-[0.3em] animate-pulse">Syncing data...</p>
             </div>
           ) : hasBlocks ? (
-            <FeeHistoryChart blocks={blocks} estimates={estimates} blockPolicyEstimates={blockPolicyEstimates} loading={loading} scaleType={scaleType} />
+            <FeeHistoryChart blocks={blocks} series={series.filter((s) => visibleKeys.has(s.key))} loading={loading} scaleType={scaleType} />
           ) : (
             <div className="flex flex-col items-center gap-4 py-20 text-[var(--muted)]">
               <Database className="w-12 h-12 opacity-20" />
