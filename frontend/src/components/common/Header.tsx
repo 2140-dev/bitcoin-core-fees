@@ -47,7 +47,15 @@ export function Header() {
                 pathname === "/stats" ? `${activeStyle} text-white shadow-md` : "text-[var(--muted)] hover:text-[var(--foreground)]"
               }`}
             >
-              Analytics
+              History
+            </Link>
+            <Link
+              href="/accuracy"
+              className={`px-2.5 md:px-4 py-1.5 rounded-lg text-[10px] md:text-xs font-black transition-all ${
+                pathname === "/accuracy" ? `${activeStyle} text-white shadow-md` : "text-[var(--muted)] hover:text-[var(--foreground)]"
+              }`}
+            >
+              Accuracy
             </Link>
             <Link
               href="/mempool"
