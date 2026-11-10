@@ -14,16 +14,29 @@ import services.collector_service as collector_service
 import services.database_service as db_service
 
 logging.basicConfig(
-    level=logging.DEBUG,
+    # INFO in production; override with LOG_LEVEL=DEBUG for local debugging.
+    level=getattr(logging, os.environ.get("LOG_LEVEL", "INFO").upper(), logging.INFO),
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
+
+# Hard cap on how many blocks /performance-data will fan out getblockstats for.
+_MAX_PERFORMANCE_BLOCKS = 1000
+
+
+def _clamp_int(value: int, lo: int, hi: int) -> int:
+    return max(lo, min(hi, value))
 
 def create_app():
     app = Flask(__name__)
     app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
     Compress(app)
-    CORS(app)
+    # Browsers reach the API same-origin through the Next.js /api proxy, so
+    # cross-origin access isn't needed in production. Lock it down via
+    # CORS_ORIGINS (comma-separated); defaults to "*" to preserve current
+    # behaviour / local dev hitting :5001 directly.
+    cors_origins = os.environ.get("CORS_ORIGINS", "*")
+    CORS(app, origins=[o.strip() for o in cors_origins.split(",")] if cors_origins != "*" else "*")
 
     limiter = Limiter(
         key_func=get_remote_address,
@@ -52,6 +65,12 @@ def create_app():
     # Routes
     # ---------------------------------------------------------------------------
 
+    @app.route("/health", methods=['GET'])
+    @limiter.exempt
+    def health():
+        # Cheap liveness probe (no RPC) for monitoring / load balancers.
+        return jsonify({"status": "ok", "chains": rpc_service.registry.chains()})
+
     @app.route("/networks", methods=['GET'])
     @limiter.limit("100 per minute")
     def networks():
@@ -63,6 +82,8 @@ def create_app():
         VALID_MODES = {"economical", "conservative", "unset"}
         if mode not in VALID_MODES:
             return jsonify({"error": f"Invalid mode '{mode}'. Must be one of: {', '.join(VALID_MODES)}"}), 400
+        target = _clamp_int(target, 1, 1008)
+        level = _clamp_int(level, 0, 3)
         chain, err = _resolve_chain()
         if err:
             return err
@@ -103,8 +124,10 @@ def create_app():
     @app.route("/performance-data/<int:start_block>/", methods=['GET'])
     @limiter.limit("50 per minute")
     def get_performance_data(start_block):
-        target = request.args.get('target', default=2, type=int)
-        count = request.args.get('count', default=100, type=int)
+        target = _clamp_int(request.args.get('target', default=2, type=int), 1, 1008)
+        # Cap the fan-out so a single request can't trigger an unbounded burst
+        # of getblockstats calls against the node.
+        count = _clamp_int(request.args.get('count', default=100, type=int), 1, _MAX_PERFORMANCE_BLOCKS)
         chain, err = _resolve_chain()
         if err:
             return err
@@ -118,7 +141,7 @@ def create_app():
     @app.route("/fees-sum/<int:start_block>/", methods=['GET'])
     @limiter.limit("50 per minute")
     def get_local_fees_sum(start_block):
-        target = request.args.get('target', default=2, type=int)
+        target = _clamp_int(request.args.get('target', default=2, type=int), 1, 1008)
         chain, err = _resolve_chain()
         if err:
             return err

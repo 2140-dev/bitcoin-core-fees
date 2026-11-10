@@ -5,3 +5,4 @@ test_rpc_ports.py
 test_getbestblockhash.py
 
 
+*.db.corrupt
