@@ -8,11 +8,12 @@ interface Props {
   colorClass: string;
   bgColorClass: string;
   total: number | undefined;
+  loading?: boolean;
 }
 
-export default function SummaryCard({ title, value, percent, icon, colorClass, bgColorClass, total }: Props) {
+export default function SummaryCard({ title, value, percent, icon, colorClass, bgColorClass, total, loading }: Props) {
   return (
-    <div className="bg-[var(--card)] p-8 rounded-3xl border border-[var(--card-border)] shadow-sm group hover:shadow-md transition-all text-left">
+    <div className={`bg-[var(--card)] p-8 rounded-3xl border border-[var(--card-border)] shadow-sm group hover:shadow-md transition-all text-left ${loading ? "opacity-40 animate-pulse" : ""}`}>
       <div className="flex justify-between items-start mb-6">
         <div className={`p-3.5 ${bgColorClass} rounded-2xl shadow-inner`}>{icon}</div>
         <div className="text-right">

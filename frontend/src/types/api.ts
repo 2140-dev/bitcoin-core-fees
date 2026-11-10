@@ -6,6 +6,10 @@ export interface AnalyticsSummary {
   underpayment_perc: number;
   within_val: number;
   within_perc: number;
+  /** True when served from the precomputed all-time cache. */
+  all_time?: boolean;
+  /** UTC timestamp (SQLite format) the all-time summary was last computed. */
+  computed_at?: string;
 }
 
 export interface BlockchainInfo {

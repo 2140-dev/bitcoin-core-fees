@@ -20,6 +20,12 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# Confirmation targets the background summary job pre-computes (matches the
+# frontend target selector). Kept here so the loop and endpoint agree.
+_SUMMARY_TARGETS = (2, 7, 144)
+# How often the primary worker recomputes the all-time accuracy summary.
+# 0 disables the background job (endpoint then falls back to a live window).
+_SUMMARY_REFRESH_SECONDS = int(os.environ.get("SUMMARY_REFRESH_SECONDS", 30 * 60))
 # Hard cap on how many blocks /performance-data will fan out getblockstats for.
 _MAX_PERFORMANCE_BLOCKS = 1000
 
@@ -142,11 +148,21 @@ def create_app():
     @limiter.limit("50 per minute")
     def get_local_fees_sum(start_block):
         target = _clamp_int(request.args.get('target', default=2, type=int), 1, 1008)
+        all_time = request.args.get("all_time", "false").lower() == "true"
         chain, err = _resolve_chain()
         if err:
             return err
         try:
+            # All-time is served from the pre-computed cache (the primary worker
+            # refreshes it in the background) so the request never fans out
+            # getblockstats over ~30k blocks. Fall back to a live window only if
+            # the cache hasn't been populated yet.
+            if all_time:
+                cached = db_service.get_summary(chain=chain, target=max(2, target))
+                if cached:
+                    return jsonify(cached)
             data = rpc_service.calculate_local_summary(target=target, start_height=start_block, chain=chain)
+            data["all_time"] = False
             return jsonify(data)
         except Exception as e:
             logger.error(f"/fees-sum failed: {e}", exc_info=True)
@@ -206,11 +222,43 @@ def create_app():
             time.sleep(6 * 3600)
 
     # Only the primary worker (the one holding the collector lock) rebuilds the
-    # snapshot, so multiple gunicorn workers don't race on the shared .tmp file
-    # and os.replace. Every worker can still serve the finished file below.
+    # snapshot, so multiple gunicorn workers don't race on the shared .tmp file.
+    # The first build runs inside the loop thread (not synchronously here) so a
+    # multi-minute tar.gz build can't block worker boot or the summary job from
+    # starting. /data/snapshot returns 503 until the first build finishes.
     if is_primary_worker:
-        _rebuild_snapshot()
         threading.Thread(target=_snapshot_loop, daemon=True).start()
+
+    # ---------------------------------------------------------------------------
+    # All-time accuracy summary — precomputed in the background
+    # ---------------------------------------------------------------------------
+    # Computing the within/over/under-paid breakdown over all history fans out
+    # getblockstats across ~30k blocks per chain, far too expensive to do on a
+    # request. The primary worker computes it periodically and stores the result
+    # per (chain, target); /fees-sum?all_time=true reads that cached row.
+
+    def _refresh_all_time_summaries():
+        for chain in rpc_service.registry.chains():
+            for target in _SUMMARY_TARGETS:
+                try:
+                    result = rpc_service.calculate_local_summary(
+                        target=target, all_time=True, chain=chain,
+                    )
+                    db_service.save_summary(chain=chain, target=target, result=result)
+                    logger.info(
+                        "All-time summary refreshed: chain=%s target=%d total=%d",
+                        chain, target, result.get("total", 0),
+                    )
+                except Exception:
+                    logger.exception("Failed to refresh all-time summary (chain=%s target=%d)", chain, target)
+
+    def _summary_loop():
+        while True:
+            _refresh_all_time_summaries()
+            time.sleep(_SUMMARY_REFRESH_SECONDS)
+
+    if is_primary_worker and _SUMMARY_REFRESH_SECONDS > 0:
+        threading.Thread(target=_summary_loop, daemon=True).start()
 
     @app.route("/data/snapshot", methods=['GET'])
     @limiter.limit("2 per hour")

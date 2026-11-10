@@ -3,38 +3,47 @@ import { api } from "../services/api";
 import { AnalyticsSummary, PerformanceData } from "../types/api";
 import { statsCache } from "../lib/statsCache";
 
+export type SummaryMode = "all-time" | "range";
+
 export function useStats(target: number = 2, chain?: string) {
   const [performanceData, setPerformanceData] = useState<PerformanceData>({ blocks: [], estimates: [], block_policy_estimates: [] });
   const [summary, setSummary] = useState<AnalyticsSummary | null>(null);
-  const [loading, setLoading] = useState(true);
+  // Chart (inclusion history) and the accuracy summary load independently so
+  // their "syncing" states are distinct and a slow summary never blocks the chart.
+  const [chartLoading, setChartLoading] = useState(true);
+  const [summaryLoading, setSummaryLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  // Summary scope: all-time (precomputed, server-cached) or the selected range.
+  const [summaryMode, setSummaryMode] = useState<SummaryMode>("all-time");
 
   const [startBlock, setStartBlock] = useState<number | null>(null);
   const [endBlock, setEndBlock] = useState<number | null>(null);
   const [latestBlock, setLatestBlock] = useState<number | null>(null);
 
-  const fetchData = useCallback(async (start: number, end: number, confTarget: number, silent = false) => {
+  const fetchPerformance = useCallback(async (start: number, end: number, confTarget: number, silent = false) => {
     try {
-      if (!silent) setLoading(true);
+      if (!silent) setChartLoading(true);
       setError(null);
-
       const count = Math.max(1, end - start);
-
-      const [pData, fSum] = await Promise.all([
-        api.getPerformanceData(start, count, confTarget, chain),
-        api.getFeesSum(start, confTarget, chain),
-      ]);
-
-      if (chain) {
-        statsCache.set(chain, confTarget, { performanceData: pData, summary: fSum, startBlock: start, endBlock: end });
-      }
+      const pData = await api.getPerformanceData(start, count, confTarget, chain);
+      if (chain) statsCache.set(chain, confTarget, { performanceData: pData, startBlock: start, endBlock: end });
       setPerformanceData(pData);
-      setSummary(fSum);
     } catch (err) {
-      const msg = err instanceof Error ? err.message : "Failed to fetch performance data";
-      setError(msg);
+      setError(err instanceof Error ? err.message : "Failed to fetch performance data");
     } finally {
-      if (!silent) setLoading(false);
+      if (!silent) setChartLoading(false);
+    }
+  }, [chain]);
+
+  const fetchSummary = useCallback(async (mode: SummaryMode, start: number, confTarget: number) => {
+    try {
+      setSummaryLoading(true);
+      const fSum = await api.getFeesSum(start, confTarget, chain, mode === "all-time");
+      setSummary(fSum);
+    } catch {
+      // Summary failure is non-fatal — keep the chart usable; leave prior value.
+    } finally {
+      setSummaryLoading(false);
     }
   }, [chain]);
 
@@ -43,59 +52,64 @@ export function useStats(target: number = 2, chain?: string) {
       const { blockcount } = await api.getBlockCount(chain);
       setLatestBlock(blockcount);
       return blockcount;
-    } catch (err) {
+    } catch {
       return null;
     }
   }, [chain]);
 
-  // Reset range and refetch when chain changes.
+  // Chain change: reset the range to the latest window, serve the chart from
+  // cache if present, then refresh both the chart and the summary.
   useEffect(() => {
     if (!chain) return;
     let cancelled = false;
     const init = async () => {
-      // Serve from cache immediately if available.
       const cached = statsCache.get(chain, target);
-      const hasCached = !!cached;
       if (cached) {
         setPerformanceData(cached.performanceData);
-        setSummary(cached.summary);
         setStartBlock(cached.startBlock);
         setEndBlock(cached.endBlock);
-        setLoading(false);
+        setChartLoading(false);
       }
-
       const currentHeight = await syncHeight();
       if (cancelled || !currentHeight) return;
       const s = currentHeight - 1000;
       const e = currentHeight;
       setStartBlock(s);
       setEndBlock(e);
-      fetchData(s, e, target, hasCached);
+      fetchPerformance(s, e, target, !!cached);
+      fetchSummary(summaryMode, s, target);
     };
     init();
     return () => { cancelled = true; };
-  // fetchData changes when chain changes, so this fires on chain switch.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [chain, syncHeight, fetchData]);
+  }, [chain, syncHeight, fetchPerformance, fetchSummary]);
 
-  // Refetch with the current range when target changes, without resetting block range.
+  // Target change: refetch chart (cache-first) and summary at the current range.
   useEffect(() => {
     if (!chain || startBlock === null || endBlock === null) return;
-    // Serve from cache immediately if available.
     const cached = statsCache.get(chain, target);
     if (cached) {
       setPerformanceData(cached.performanceData);
-      setSummary(cached.summary);
-      setLoading(false);
-      return;
+      setChartLoading(false);
+    } else {
+      fetchPerformance(startBlock, endBlock, target);
     }
-    fetchData(startBlock, endBlock, target);
+    fetchSummary(summaryMode, startBlock, target);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [target]);
 
+  // Summary-scope toggle: refetch the summary only (chart is unaffected).
+  useEffect(() => {
+    if (!chain || startBlock === null) return;
+    fetchSummary(summaryMode, startBlock, target);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [summaryMode]);
+
   const handleApply = () => {
     if (startBlock !== null && endBlock !== null) {
-      fetchData(startBlock, endBlock, target);
+      fetchPerformance(startBlock, endBlock, target);
+      // Only the range-scoped summary depends on the selected window.
+      if (summaryMode === "range") fetchSummary("range", startBlock, target);
     }
   };
 
@@ -104,7 +118,10 @@ export function useStats(target: number = 2, chain?: string) {
     estimates: performanceData.estimates,
     blockPolicyEstimates: performanceData.block_policy_estimates,
     summary,
-    loading,
+    summaryMode,
+    setSummaryMode,
+    chartLoading,
+    summaryLoading,
     error,
     startBlock,
     setStartBlock,
@@ -112,6 +129,6 @@ export function useStats(target: number = 2, chain?: string) {
     setEndBlock,
     latestBlock,
     handleApply,
-    syncHeight
+    syncHeight,
   };
 }

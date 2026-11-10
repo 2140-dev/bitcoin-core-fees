@@ -1,9 +1,8 @@
 import { api } from "../services/api";
-import { PerformanceData, AnalyticsSummary } from "../types/api";
+import { PerformanceData } from "../types/api";
 
 export interface StatsSnapshot {
   performanceData: PerformanceData;
-  summary: AnalyticsSummary | null;
   startBlock: number;
   endBlock: number;
 }
@@ -43,13 +42,11 @@ export async function prefetchStats(chain: string): Promise<void> {
     await Promise.all(
       TARGETS.map(async (target) => {
         try {
-          const [pData, fSum] = await Promise.all([
-            api.getPerformanceData(startBlock, 1000, target, chain),
-            api.getFeesSum(startBlock, target, chain),
-          ]);
+          // Prefetch the chart data only; the summary loads separately and is
+          // cheap (all-time is server-cached).
+          const pData = await api.getPerformanceData(startBlock, 1000, target, chain);
           statsCache.set(chain, target, {
             performanceData: pData,
-            summary: fSum,
             startBlock,
             endBlock,
           });

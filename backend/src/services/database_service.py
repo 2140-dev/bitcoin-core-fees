@@ -73,6 +73,30 @@ def init_db(chain: str = "main"):
                 CREATE INDEX IF NOT EXISTS idx_poll_height_target
                 ON fee_estimates(poll_height, target)
             ''')
+            # Cached all-time accuracy summary, one row per (target, all_time).
+            # Written by the primary worker's background job, read by /fees-sum.
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS summary_cache (
+                    target INTEGER NOT NULL,
+                    all_time INTEGER NOT NULL DEFAULT 1,
+                    total INTEGER,
+                    within_val INTEGER,
+                    overpayment_val INTEGER,
+                    underpayment_val INTEGER,
+                    computed_at DATETIME DEFAULT CURRENT_TIMESTAMP,  -- UTC
+                    PRIMARY KEY (target, all_time)
+                )
+            ''')
+            # Persistent per-block feerate range (p10/p90). Immutable once a
+            # block is buried, so cached forever to avoid re-fetching
+            # getblockstats on every stats/summary request.
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS block_stats (
+                    height INTEGER PRIMARY KEY,
+                    low REAL,
+                    high REAL
+                )
+            ''')
             conn.commit()
         logger.info(f"Database initialised at {db_path}")
     except sqlite3.Error as e:
@@ -97,8 +121,10 @@ def save_estimate(poll_height, target, feerate, chain="main", block_policy_only:
         raise
 
 
-def get_estimates_in_range(start_height, end_height, target=2, chain="main", block_policy_only: bool = False):
-    if end_height - start_height > MAX_RANGE_BLOCKS:
+def get_estimates_in_range(start_height, end_height, target=2, chain="main", block_policy_only: bool = False, enforce_cap: bool = True):
+    # enforce_cap=False is used only by the background all-time summary job,
+    # which legitimately scans the full history; request paths keep the cap.
+    if enforce_cap and end_height - start_height > MAX_RANGE_BLOCKS:
         logger.warning(
             f"Requested range [{start_height}, {end_height}] exceeds MAX_RANGE_BLOCKS={MAX_RANGE_BLOCKS}. Clamping."
         )
@@ -151,3 +177,103 @@ def get_db_height_range(target=2, chain="main"):
     except sqlite3.Error as e:
         logger.error(f"Failed to get DB height range: {e}", exc_info=True)
         raise
+
+
+def save_summary(chain="main", target=2, result=None, all_time: bool = True):
+    """Upsert a precomputed accuracy summary for (target, all_time)."""
+    db_path = get_db_path(chain)
+    try:
+        with _connect(db_path) as conn:
+            conn.execute('''
+                INSERT INTO summary_cache
+                    (target, all_time, total, within_val, overpayment_val, underpayment_val, computed_at)
+                VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+                ON CONFLICT(target, all_time) DO UPDATE SET
+                    total=excluded.total,
+                    within_val=excluded.within_val,
+                    overpayment_val=excluded.overpayment_val,
+                    underpayment_val=excluded.underpayment_val,
+                    computed_at=excluded.computed_at
+            ''', (
+                target, int(all_time),
+                result["total"], result["within_val"],
+                result["overpayment_val"], result["underpayment_val"],
+            ))
+            conn.commit()
+    except sqlite3.Error as e:
+        logger.error(f"Failed to save summary (target={target}): {e}", exc_info=True)
+        raise
+
+
+def save_block_ranges(chain, ranges):
+    """Persist {height: (low, high)} feerate ranges. No-op on empty input."""
+    if not ranges:
+        return
+    db_path = get_db_path(chain)
+    try:
+        with _connect(db_path) as conn:
+            conn.executemany(
+                'INSERT OR REPLACE INTO block_stats (height, low, high) VALUES (?, ?, ?)',
+                [(h, lo, hi) for h, (lo, hi) in ranges.items()],
+            )
+            conn.commit()
+    except sqlite3.Error as e:
+        logger.error(f"Failed to save block ranges: {e}", exc_info=True)
+        raise
+
+
+def get_block_ranges(chain, heights):
+    """Return {height: (low, high)} for cached heights (missing ones omitted)."""
+    heights = list(heights)
+    if not heights:
+        return {}
+    db_path = get_db_path(chain)
+    out = {}
+    try:
+        with _connect(db_path) as conn:
+            cur = conn.cursor()
+            CHUNK = 900  # stay under SQLite's variable limit
+            for i in range(0, len(heights), CHUNK):
+                chunk = heights[i:i + CHUNK]
+                placeholders = ','.join('?' * len(chunk))
+                cur.execute(
+                    f'SELECT height, low, high FROM block_stats WHERE height IN ({placeholders})',
+                    chunk,
+                )
+                for h, lo, hi in cur.fetchall():
+                    out[h] = (lo, hi)
+    except sqlite3.Error as e:
+        logger.error(f"Failed to get block ranges: {e}", exc_info=True)
+        raise
+    return out
+
+
+def get_summary(chain="main", target=2, all_time: bool = True):
+    """Return the cached summary dict for (target, all_time), or None if absent."""
+    db_path = get_db_path(chain)
+    try:
+        with _connect(db_path) as conn:
+            conn.row_factory = sqlite3.Row
+            cur = conn.execute(
+                'SELECT * FROM summary_cache WHERE target = ? AND all_time = ?',
+                (target, int(all_time)),
+            )
+            row = cur.fetchone()
+    except sqlite3.Error as e:
+        logger.error(f"Failed to get summary (target={target}): {e}", exc_info=True)
+        raise
+
+    if not row:
+        return None
+    total = row["total"] or 0
+    return {
+        "total": total,
+        "within_val": row["within_val"],
+        "within_perc": (row["within_val"] / total) if total else 0,
+        "overpayment_val": row["overpayment_val"],
+        "overpayment_perc": (row["overpayment_val"] / total) if total else 0,
+        "underpayment_val": row["underpayment_val"],
+        "underpayment_perc": (row["underpayment_val"] / total) if total else 0,
+        "all_time": bool(row["all_time"]),
+        "computed_at": row["computed_at"],
+    }
