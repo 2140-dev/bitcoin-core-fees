@@ -81,18 +81,27 @@ def init_db(chain: str = "main"):
                 CREATE INDEX IF NOT EXISTS idx_poll_height_target
                 ON fee_estimates(poll_height, target)
             ''')
-            # Cached all-time accuracy summary, one row per (target, all_time).
-            # Written by the primary worker's background job, read by /fees-sum.
+            # Cached accuracy summary, one row per (target, all_time, mode,
+            # estimator). It's a regenerable cache; if an older schema (without
+            # the mode/estimator key) exists, drop it — the background job
+            # repopulates within a cycle.
+            existing_cols = [r[1] for r in cursor.execute("PRAGMA table_info(summary_cache)").fetchall()]
+            if existing_cols and 'mode' not in existing_cols:
+                # IF EXISTS guards the race where concurrent workers both try to drop.
+                cursor.execute('DROP TABLE IF EXISTS summary_cache')
             cursor.execute('''
                 CREATE TABLE IF NOT EXISTS summary_cache (
                     target INTEGER NOT NULL,
                     all_time INTEGER NOT NULL DEFAULT 1,
+                    mode TEXT NOT NULL DEFAULT 'economical',
+                    block_policy_only INTEGER NOT NULL DEFAULT 0,
                     total INTEGER,
                     within_val INTEGER,
                     overpayment_val INTEGER,
                     underpayment_val INTEGER,
+                    first_height INTEGER,
                     computed_at DATETIME DEFAULT CURRENT_TIMESTAMP,  -- UTC
-                    PRIMARY KEY (target, all_time)
+                    PRIMARY KEY (target, all_time, mode, block_policy_only)
                 )
             ''')
             # Persistent per-block feerate range (p10/p90). Immutable once a
@@ -167,14 +176,14 @@ def get_estimates_in_range(start_height, end_height, target=2, chain="main", blo
         raise
 
 
-def get_db_height_range(target=2, chain="main"):
+def get_db_height_range(target=2, chain="main", mode: str = "economical", block_policy_only: bool = False):
     db_path = get_db_path(chain)
     try:
         with _connect(db_path) as conn:
             cursor = conn.cursor()
             cursor.execute(
-                'SELECT MIN(poll_height), MAX(poll_height) FROM fee_estimates WHERE target = ?',
-                (target,)
+                'SELECT MIN(poll_height), MAX(poll_height) FROM fee_estimates WHERE target = ? AND mode = ? AND block_policy_only = ?',
+                (target, mode, int(block_policy_only)),
             )
             row = cursor.fetchone()
 
@@ -187,25 +196,27 @@ def get_db_height_range(target=2, chain="main"):
         raise
 
 
-def save_summary(chain="main", target=2, result=None, all_time: bool = True):
-    """Upsert a precomputed accuracy summary for (target, all_time)."""
+def save_summary(chain="main", target=2, result=None, all_time: bool = True, mode: str = "economical", block_policy_only: bool = False):
+    """Upsert a precomputed accuracy summary for (target, all_time, mode, estimator)."""
     db_path = get_db_path(chain)
     try:
         with _connect(db_path) as conn:
             conn.execute('''
                 INSERT INTO summary_cache
-                    (target, all_time, total, within_val, overpayment_val, underpayment_val, computed_at)
-                VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
-                ON CONFLICT(target, all_time) DO UPDATE SET
+                    (target, all_time, mode, block_policy_only, total, within_val, overpayment_val, underpayment_val, first_height, computed_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+                ON CONFLICT(target, all_time, mode, block_policy_only) DO UPDATE SET
                     total=excluded.total,
                     within_val=excluded.within_val,
                     overpayment_val=excluded.overpayment_val,
                     underpayment_val=excluded.underpayment_val,
+                    first_height=excluded.first_height,
                     computed_at=excluded.computed_at
             ''', (
-                target, int(all_time),
+                target, int(all_time), mode, int(block_policy_only),
                 result["total"], result["within_val"],
                 result["overpayment_val"], result["underpayment_val"],
+                result.get("first_height"),
             ))
             conn.commit()
     except sqlite3.Error as e:
@@ -256,15 +267,15 @@ def get_block_ranges(chain, heights):
     return out
 
 
-def get_summary(chain="main", target=2, all_time: bool = True):
-    """Return the cached summary dict for (target, all_time), or None if absent."""
+def get_summary(chain="main", target=2, all_time: bool = True, mode: str = "economical", block_policy_only: bool = False):
+    """Return the cached summary dict for (target, all_time, mode, estimator), or None."""
     db_path = get_db_path(chain)
     try:
         with _connect(db_path) as conn:
             conn.row_factory = sqlite3.Row
             cur = conn.execute(
-                'SELECT * FROM summary_cache WHERE target = ? AND all_time = ?',
-                (target, int(all_time)),
+                'SELECT * FROM summary_cache WHERE target = ? AND all_time = ? AND mode = ? AND block_policy_only = ?',
+                (target, int(all_time), mode, int(block_policy_only)),
             )
             row = cur.fetchone()
     except sqlite3.Error as e:
@@ -283,5 +294,8 @@ def get_summary(chain="main", target=2, all_time: bool = True):
         "underpayment_val": row["underpayment_val"],
         "underpayment_perc": (row["underpayment_val"] / total) if total else 0,
         "all_time": bool(row["all_time"]),
+        "mode": row["mode"],
+        "block_policy_only": bool(row["block_policy_only"]),
+        "first_height": row["first_height"],
         "computed_at": row["computed_at"],
     }

@@ -3,28 +3,35 @@ import { api } from "../services/api";
 import { AnalyticsSummary } from "../types/api";
 import { useBlockHeight } from "./useBlockHeight";
 
-export type SummaryMode = "all-time" | "range";
+export type SummaryScope = "all-time" | "range";
+export type FeeMode = "economical" | "conservative";
+export type Estimator = "auto" | "block_policy";
 
-/** Estimate-accuracy summary — all-time (cached) or over a block range (Accuracy page). */
+/** Estimate-accuracy summary for a (scope, mode, estimator) combination. */
 export function useSummary(target: number, chain?: string) {
   const [summary, setSummary] = useState<AnalyticsSummary | null>(null);
   const [loading, setLoading] = useState(true);
-  const [mode, setMode] = useState<SummaryMode>("all-time");
+  const [scope, setScope] = useState<SummaryScope>("all-time");
+  const [feeMode, setFeeMode] = useState<FeeMode>("economical");
+  const [estimator, setEstimator] = useState<Estimator>("auto");
   const [startBlock, setStartBlock] = useState<number | null>(null);
   const [endBlock, setEndBlock] = useState<number | null>(null);
   const { latestBlock, syncHeight } = useBlockHeight(chain);
 
-  const fetchSummary = useCallback(async (m: SummaryMode, start: number, confTarget: number) => {
-    try {
-      setLoading(true);
-      const fSum = await api.getFeesSum(start, confTarget, chain, m === "all-time");
-      setSummary(fSum);
-    } catch {
-      // non-fatal — keep the previous value
-    } finally {
-      setLoading(false);
-    }
-  }, [chain]);
+  const fetchSummary = useCallback(
+    async (scp: SummaryScope, start: number, confTarget: number, fMode: FeeMode, est: Estimator) => {
+      try {
+        setLoading(true);
+        const fSum = await api.getFeesSum(start, confTarget, chain, scp === "all-time", fMode, est);
+        setSummary(fSum);
+      } catch {
+        // non-fatal — keep the previous value
+      } finally {
+        setLoading(false);
+      }
+    },
+    [chain],
+  );
 
   // Chain change: establish the default range, then fetch.
   useEffect(() => {
@@ -36,28 +43,32 @@ export function useSummary(target: number, chain?: string) {
       const s = h - 1000;
       setStartBlock(s);
       setEndBlock(h);
-      fetchSummary(mode, s, target);
+      fetchSummary(scope, s, target, feeMode, estimator);
     })();
     return () => { cancelled = true; };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [chain, syncHeight, fetchSummary]);
 
-  // Target or mode change: refetch (all-time ignores the range server-side).
+  // Any selector change: refetch (all-time ignores the range server-side).
   useEffect(() => {
     if (!chain || startBlock === null) return;
-    fetchSummary(mode, startBlock, target);
+    fetchSummary(scope, startBlock, target, feeMode, estimator);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [target, mode]);
+  }, [target, scope, feeMode, estimator]);
 
   const handleApply = () => {
-    if (startBlock !== null) fetchSummary(mode, startBlock, target);
+    if (startBlock !== null) fetchSummary(scope, startBlock, target, feeMode, estimator);
   };
 
   return {
     summary,
     loading,
-    mode,
-    setMode,
+    scope,
+    setScope,
+    feeMode,
+    setFeeMode,
+    estimator,
+    setEstimator,
     startBlock,
     setStartBlock,
     endBlock,

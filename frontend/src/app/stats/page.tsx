@@ -88,12 +88,14 @@ export default function HistoryPage() {
               <BarChart3 className="w-6 h-6 text-orange-500" />
               Inclusion History
             </h2>
-            <p className="text-[10px] uppercase font-bold text-[var(--muted)] mt-1 tracking-widest">p10 to p90 block fee distribution</p>
+            <p className="text-[10px] uppercase font-bold text-[var(--muted)] mt-1 tracking-widest">
+              each block&apos;s p10–p90 fee range vs. the estimate · economical (default mode)
+            </p>
           </div>
           <div className="flex gap-4 text-[9px] font-medium uppercase tracking-wider text-[var(--muted)] bg-[var(--surface-2)] px-4 py-2 rounded-lg border border-[var(--card-border)]">
-            <div className="flex items-center gap-1.5"><div className="w-2.5 h-2.5 bg-[var(--muted)] opacity-40 rounded-sm"></div> p10–p90 range</div>
-            <div className="flex items-center gap-1.5"><div className="w-2.5 h-0.5 bg-[var(--data-blue)] rounded-full"></div> Fee estimate</div>
-            <div className="flex items-center gap-1.5"><div className="w-2.5 h-0.5 rounded-full" style={{ backgroundColor: "#d97706" }}></div> Block policy</div>
+            <div className="flex items-center gap-1.5"><div className="w-2.5 h-2.5 bg-[var(--muted)] opacity-40 rounded-sm"></div> block p10–p90</div>
+            <div className="flex items-center gap-1.5"><div className="w-2.5 h-0.5 bg-[var(--data-blue)] rounded-full"></div> mempool_policy</div>
+            <div className="flex items-center gap-1.5"><div className="w-2.5 h-0.5 rounded-full" style={{ backgroundColor: "#d97706" }}></div> block_policy</div>
           </div>
         </div>
 

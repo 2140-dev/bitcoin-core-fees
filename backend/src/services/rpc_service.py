@@ -106,5 +106,7 @@ def calculate_local_summary(
     start_height: Optional[int] = None,
     chain: Optional[str] = None,
     all_time: bool = False,
+    mode: str = "economical",
+    block_policy_only: bool = False,
 ) -> Dict[str, Any]:
-    return get_client(chain).calculate_local_summary(target, start_height, all_time)
+    return get_client(chain).calculate_local_summary(target, start_height, all_time, mode, block_policy_only)

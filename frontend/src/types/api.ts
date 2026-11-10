@@ -8,6 +8,8 @@ export interface AnalyticsSummary {
   within_perc: number;
   /** True when served from the precomputed all-time cache. */
   all_time?: boolean;
+  /** Earliest block height included in the summary window. */
+  first_height?: number | null;
   /** UTC timestamp (SQLite format) the all-time summary was last computed. */
   computed_at?: string;
 }
