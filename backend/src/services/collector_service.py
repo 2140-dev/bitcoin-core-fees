@@ -18,32 +18,35 @@ def _run_collector_for_chain(chain: str):
     display = rpc_service.CHAIN_DISPLAY_NAMES.get(chain, chain.upper())
     logger.info(f"[Collector:{display}] Starting (7s interval)...")
     targets = [2, 7, 144]
+    # Full matrix: estimatesmartfee mode x fee-rate estimator. block_policy_only
+    # False = the node's auto estimator (mempool_policy on this build), True =
+    # the legacy block_policy estimator. "unset" resolves to economical, so we
+    # request economical explicitly and conservative as the second mode.
+    modes = ["economical", "conservative"]
+    estimators = [False, True]  # block_policy_only flag
 
     while True:
         start_time = time.time()
         try:
             current_height = client.get_block_count()
             for t in targets:
-                try:
-                    res = client.estimate_smart_fee(t, "unset", 1)
-                    if "feerate_sat_per_vb" in res:
-                        rate = res["feerate_sat_per_vb"]
-                        db_service.save_estimate(current_height, t, rate, chain=chain)
-                        logger.info(
-                            f"[Collector:{display}] SAVED: target={t} height={current_height} rate={rate:.2f} sat/vB"
-                        )
-                except Exception as e:
-                    logger.error(f"[Collector:{display}] Failed for target {t}: {e}")
-                try:
-                    bp_res = client.estimate_smart_fee(t, "unset", 1, block_policy_only=True)
-                    if "feerate_sat_per_vb" in bp_res:
-                        bp_rate = bp_res["feerate_sat_per_vb"]
-                        db_service.save_estimate(current_height, t, bp_rate, chain=chain, block_policy_only=True)
-                        logger.info(
-                            f"[Collector:{display}] SAVED (block_policy): target={t} height={current_height} rate={bp_rate:.2f} sat/vB"
-                        )
-                except Exception as e:
-                    logger.error(f"[Collector:{display}] Failed block_policy for target {t}: {e}")
+                for mode in modes:
+                    for block_policy_only in estimators:
+                        label = "block_policy" if block_policy_only else "auto"
+                        try:
+                            res = client.estimate_smart_fee(t, mode, 1, block_policy_only=block_policy_only)
+                            if "feerate_sat_per_vb" in res:
+                                rate = res["feerate_sat_per_vb"]
+                                db_service.save_estimate(
+                                    current_height, t, rate, chain=chain,
+                                    block_policy_only=block_policy_only, mode=mode,
+                                )
+                                logger.info(
+                                    f"[Collector:{display}] SAVED: target={t} mode={mode} est={label} "
+                                    f"height={current_height} rate={rate:.2f} sat/vB"
+                                )
+                        except Exception as e:
+                            logger.error(f"[Collector:{display}] Failed target={t} mode={mode} est={label}: {e}")
         except Exception as e:
             logger.error(f"[Collector:{display}] Loop error: {e}")
 
